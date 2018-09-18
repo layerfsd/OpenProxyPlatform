@@ -1,0 +1,19 @@
+Client:			---表示客户端
+	Android		---表示Android端
+		App		---表示可以直接使用的APP
+		SDK		---表示可以集成的SDK开发包形式
+	IOS			---表示IOS端
+		App		---表示可以直接使用的APP
+		SDK		---表示可以集成的SDK开发包形式
+	Linux		---表示Linux端
+		App		---表示可以直接使用的APP
+		SDK		---表示可以集成的SDK开发包形式
+	MacOS		---表示MacOS端
+		App		---表示可以直接使用的APP
+		SDK		---表示可以集成的SDK开发包形式
+	Windows		---表示Windows端
+		App		---表示可以直接使用的APP
+		SDK		---表示可以集成的SDK开发包形式
+		
+Gateway: 		---表示网关
+	
