@@ -1,0 +1,57 @@
+// OpensslProxyLocal.cpp : 定义控制台应用程序的入口点。
+//
+
+#include "stdafx.h"
+#include <Winsock2.h>
+#include <Windows.h>
+#include <WS2tcpip.h>
+#include <mswsock.h>
+#include <stdio.h>
+#include <process.h>
+#include "../OpensslProxyDrvCtrl/DrvCtrlApi.h"
+#include "../common/CLog.h"
+#include "../common/CommDef.h"
+#include "../common/CommBizDefine.h"
+#include "../common/Sem.h"
+#include "../common/Queue.h"
+#include "OpensslProxyWorker.h"
+#include "OpensslProxyPacketDispatch.h"
+#include "OpenSSLProxyMgr.h"
+
+
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "OpensslProxyDrvCtrl.lib")
+
+int main()
+{
+	/*1. 需要先初始化驱动库*/
+	if ( FALSE == OpenSSLProxy_DrvCtrl_EnvLibInit())
+	{
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Driver enviroment error!\n");
+		goto Exit;
+	}
+	else
+	{
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***INIT***: OpenSSLProxy Driver enviroment Init OK!");
+	}
+
+	/*2. 初始化管理器*/
+	if ( SYS_ERR == OpenSSLProxy_MgrInit() )
+	{
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Driver enviroment error!\n");
+		goto Exit;
+	}
+	else
+	{
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***INIT***: Local Proxy Manager Init  OK!");
+	}
+
+
+
+	system("pause");
+Exit:
+	OpenSSLProxy_DrvCtrl_EnvLibUnInit();
+	CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***STOP***: The End!");
+    return 0;
+}
+
