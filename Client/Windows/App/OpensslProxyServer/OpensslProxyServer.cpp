@@ -41,8 +41,8 @@ int main(int argc, char *argv[])
 	int			iSendLen = 0;
 	int			iRecvLen = 0;
 	int			iCount = 0;
-	int			sockfd = 0;
-	int			new_fd = 0;
+    SOCKET   sockfd = 0;
+    SOCKET	new_fd = 0;
 
 	/*初始化winsock32环境*/
 	wVersionRequested = MAKEWORD(2, 2);
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
 		{
 			memset(acCliAddr,0, IPADDRLEN); 
 			inet_ntop(AF_INET, &clientaddr.sin_addr, acCliAddr, IPADDRLEN);
-			printf("server: got connection from %s, port %d, socket %d \n", acCliAddr, ntohs(clientaddr.sin_port), new_fd);
+			printf("server: got connection from %s, port %d, socket %d \n", acCliAddr, ntohs(clientaddr.sin_port), (int)new_fd);
 		}
 		
 		pstSSL = SSL_new(pstSSlCtx);
@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
 			break;
 		}
 
-		SSL_set_fd(pstSSL, new_fd);
+		SSL_set_fd(pstSSL, (int)new_fd);
 		iError = SSL_accept(pstSSL);
 		if ( iError == -1)
 		{

@@ -76,8 +76,10 @@ int main(int argc, char *argv[])
     {
         CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***INIT***: Rule match enable successful!");
     }
+
 	system("pause");
 Exit:
+    OpenSSLProxy_MgrUnInit();
 	OpenSSLProxy_DrvCtrl_EnvLibUnInit();
 	CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***STOP***: The End!");
     return 0;

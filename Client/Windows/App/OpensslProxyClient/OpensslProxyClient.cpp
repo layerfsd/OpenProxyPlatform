@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
 	struct in_addr		 ipaddr = { 0 };
 	char			acBuf[MAXBUFSIZE] = { 0 };
 	char			acSevAddr[IPADDRLEN] = { 0 };
-	int			sockfd = 0;
+	SOCKET	sockfd = 0;
 	int			iError = 0;
 	int			iError2 = 0;
 	int			argPort = 0;
@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
 		goto ErrorExit;
 	}
 
-	SSL_set_fd(pstSSL, sockfd);
+	SSL_set_fd(pstSSL, (int)sockfd);
 
 	iError = SSL_connect(pstSSL);
 	if (iError == -1)

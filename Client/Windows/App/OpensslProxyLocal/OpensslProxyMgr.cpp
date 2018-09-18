@@ -117,6 +117,17 @@ VOID OpenSSLProxy_MgrUnInit()
 {
 	if (NULL != g_pstMgrCtx)
 	{
+        if (NULL != g_pstMgrCtx->pstClientDispatchCtx)
+        {
+            OpensslProxy_DispatchPackCtxRelease(g_pstMgrCtx->pstClientDispatchCtx);
+            g_pstMgrCtx->pstClientDispatchCtx = NULL;
+        }
+
+        if (NULL != g_pstMgrCtx->pstWorkerCtx)
+        {
+            OpensslProxy_NetworkEventWorkerRelease(g_pstMgrCtx->pstWorkerCtx);
+            g_pstMgrCtx->pstWorkerCtx = NULL;
+        }
 
 		free(g_pstMgrCtx);
 		g_pstMgrCtx = NULL;

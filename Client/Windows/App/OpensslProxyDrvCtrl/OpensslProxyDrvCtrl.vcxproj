@@ -22,7 +22,7 @@
     <ProjectGuid>{13016632-EC5E-46E4-9B70-1948B387E8BF}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>OpensslProxyDrvCtrl</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

@@ -45,6 +45,7 @@ VOID OpenSSLProxy_DrvCtrl_EnvLibUnInit()
 {
 	if (NULL != g_pstDevIoCtrl)
 	{
+        g_pstDevIoCtrl->RuleMatchDisable();
 		g_pstDevIoCtrl->CloseDev();
 
 		delete g_pstDevIoCtrl;
@@ -83,7 +84,7 @@ BOOLEAN	OpenSSLProxy_DrvCtrl_SetLocalProxyInfo(UINT32 uiPID, UINT32 uiTcpPort)
 	return FALSE;
 }
 
-BOOLEAN       OpenSSLProxy_DrvCtrl_SetRuleIPAddr(UINT32 uiIPAddr, UINT32 uiIPPort)
+BOOLEAN   OpenSSLProxy_DrvCtrl_SetRuleIPAddr(UINT32 uiIPAddr, UINT32 uiIPPort)
 {
     if (NULL != g_pstDevIoCtrl)
     {
@@ -92,7 +93,7 @@ BOOLEAN       OpenSSLProxy_DrvCtrl_SetRuleIPAddr(UINT32 uiIPAddr, UINT32 uiIPPor
     return FALSE;
 }
 
-BOOLEAN       OpenSSLProxy_DrvCtrl_DelRuleIPAddr(UINT32 uiIPAddr, UINT32 uiIPPort)
+BOOLEAN   OpenSSLProxy_DrvCtrl_DelRuleIPAddr(UINT32 uiIPAddr, UINT32 uiIPPort)
 {
     if (NULL != g_pstDevIoCtrl)
     {
@@ -100,7 +101,7 @@ BOOLEAN       OpenSSLProxy_DrvCtrl_DelRuleIPAddr(UINT32 uiIPAddr, UINT32 uiIPPor
     }
     return FALSE;
 }
-BOOLEAN       OpenSSLProxy_DrvCtrl_ClearRuleIPAddr()
+BOOLEAN   OpenSSLProxy_DrvCtrl_ClearRuleIPAddr()
 {
     if (NULL != g_pstDevIoCtrl)
     {
@@ -108,7 +109,7 @@ BOOLEAN       OpenSSLProxy_DrvCtrl_ClearRuleIPAddr()
     }
     return FALSE;
 }
-BOOLEAN       OpenSSLProxy_DrvCtrl_ClearRuleIPAddrWithType(UINT32 uiType)
+BOOLEAN   OpenSSLProxy_DrvCtrl_ClearRuleIPAddrWithType(UINT32 uiType)
 {
     if (NULL != g_pstDevIoCtrl)
     {
@@ -117,7 +118,7 @@ BOOLEAN       OpenSSLProxy_DrvCtrl_ClearRuleIPAddrWithType(UINT32 uiType)
     return FALSE;
 }
 
-BOOLEAN       OpenSSLProxy_DrvCtrl_SetLocalPortRange(UINT32 uiLocalStart, UINT32 uiLocalEnd)
+BOOLEAN  OpenSSLProxy_DrvCtrl_SetLocalPortRange(UINT32 uiLocalStart, UINT32 uiLocalEnd)
 {
     if (NULL != g_pstDevIoCtrl)
     {
@@ -126,7 +127,7 @@ BOOLEAN       OpenSSLProxy_DrvCtrl_SetLocalPortRange(UINT32 uiLocalStart, UINT32
     return FALSE;
 }
 
-UINT32           OpenSSLProxy_DrvCtrl_GetLocalPortRange(CHAR *pcBuf, INT32 uiBufLen)
+UINT32      OpenSSLProxy_DrvCtrl_GetLocalPortRange(CHAR *pcBuf, INT32 uiBufLen)
 {
     if (NULL != g_pstDevIoCtrl)
     {
