@@ -125,8 +125,9 @@ BOOLEAN	DeviceIoCtrl::SetRuleIPAddr(UINT32 uiIPAddr, UINT32 uiIPPort)
         return FALSE;
     }
 
-    stIPAddr.uiRuleIPAddr = uiIPAddr;
-    stIPAddr.uiRulePort     = uiIPPort;
+    /*接口使用的是网络序*/
+    stIPAddr.uiRuleIPAddr = htonl(uiIPAddr);
+    stIPAddr.uiRulePort     = htons(uiIPPort);
     dwSize = sizeof(stIPAddr);
 
     if (0 == DeviceIoControl(m_hDev, DEVICE_IOCTL_SETRULEIPPORT, &stIPAddr, dwSize, NULL, NULL, &dwRet, NULL))

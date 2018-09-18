@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
 {
     UINT32          uiIPAddr   = 0;
     UINT32          uiIPPort    = 0;
-
+    struct in_addr stIpAddr = {0};
     if (argc < 2 )
     {
         printf("Usage: OpensslProxyLocal.exe  ipaddr port\n");
@@ -34,8 +34,10 @@ int main(int argc, char *argv[])
     }
     else
     {
-        uiIPAddr = atoi(argv[1]);
+        inet_pton(AF_INET, argv[1], &stIpAddr);
+        uiIPAddr = ntohl(stIpAddr.s_addr);
         uiIPPort = atoi(argv[2]);
+        //printf("****WelCome******Rule: [%08x:%d]\n", uiIPAddr, uiIPPort);
     }
 
 	/*1. 需要先初始化驱动库*/
@@ -67,7 +69,7 @@ int main(int argc, char *argv[])
     }
 
     /*启动规则匹配*/
-    if ( TRUE == OpenSSLProxy_DrvCtrl_RuleMatchEnable() )
+    if ( FALSE == OpenSSLProxy_DrvCtrl_RuleMatchEnable() )
     {
         CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Rule enable error!\n");
         goto Exit;

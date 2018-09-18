@@ -161,9 +161,12 @@ VOID OpenSSLProxy_ConnectionRedirectClassify(
 		goto Exit;
 	}
 
+    /*KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Tcp connection Info: [pto=%d] %08x:%d --> %08x:%d,PID=%d\n",
+        Protocol, ntohl(localipaddr), ntohs(localport), ntohl(remoteipaddr), ntohs(remotePort), ProcessID));*/
+
 	if ( TRUE == OpenSSLProxy_RuleIsMatch(remoteipaddr, remotePort) )
 	{
-		KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Ale Redirect connection Rule is Match! [pto=%d] %08x:%d --> %08x:%d,PID=%d\n",
+		KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Ale Redirect connection Rule is Match! [pto=%02d] %08x:%d --> %08x:%d,PID=%d\n",
 			Protocol, ntohl(localipaddr), ntohs(localport), ntohl(remoteipaddr), ntohs(remotePort), ProcessID));
 
 		if (INETADDR_ISANY((PSOCKADDR)&(pConnectRequest->localAddressAndPort)))

@@ -75,12 +75,12 @@ NTSTATUS DeviceIoControl(
 					Status = OpenSSLProxy_RuleEntryAdd(pRuleInfo->uiRuleIPAddr, (USHORT)pRuleInfo->uiRulePort);
 					if (STATUS_SUCCESS != Status)
 					{
-						KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device add rule info error! [%d - %d]!\n",
+						KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device add rule info error! [%08x:%d]!\n",
 							pRuleInfo->uiRuleIPAddr, pRuleInfo->uiRulePort));
 					}
 					else
 					{
-						KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device add rule info successful! [%d - %d]!\n",
+						KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device add rule info successful! [%08x:%d]!\n",
 							pRuleInfo->uiRuleIPAddr, pRuleInfo->uiRulePort));
 					}
 				}
@@ -99,7 +99,7 @@ NTSTATUS DeviceIoControl(
 				{
 					OpenSSLProxy_RuleEntryRemove(pRuleInfo->uiRuleIPAddr, (USHORT)pRuleInfo->uiRulePort);
 					
-					KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device delete rule info successful! [%d - %d]!\n",
+					KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device delete rule info successful! [%08x:%d]!\n",
 						pRuleInfo->uiRuleIPAddr, pRuleInfo->uiRulePort));
 				}
 			}

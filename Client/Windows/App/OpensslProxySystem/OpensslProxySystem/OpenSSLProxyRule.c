@@ -370,7 +370,7 @@ BOOLEAN OpenSSLProxy_RuleIsMatch(IN UINT32 uiIPAddr, IN USHORT usPort)
 	/*3. 10.10.10.1:8080 ，地址+端口完全匹配的规则*/
 
 #if  DBG
-	KdPrint(("[OPENSSLDRV]: #OpenSSLProxy_RuleIsMatch#-->Match Rule IPAddr=%08x:%d\n", uiIPAddr, usPort));
+	KdPrint(("[OPENSSLDRV]: #OpenSSLProxy_RuleIsMatch#-->Match Rule IPAddr=%08x:%d\n", ntohl(uiIPAddr), ntohs(usPort)));
 #endif
 	return FALSE;
 }
