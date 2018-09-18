@@ -7,6 +7,9 @@ typedef struct tagWorkerContext
 	CRITICAL_SECTION			stWorkerLock;										/*Í³Ò»Ëø*/
 }WORKER_CTX_S, *PWORKER_CTX_S;
 
+WORKER_CTX_S *OpensslProxy_NetworkEventWorkerCreate();
+
+VOID OpensslProxy_NetworkEventWorkerRelease(PWORKER_CTX_S pstWorker);
 
 
 

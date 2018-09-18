@@ -72,13 +72,41 @@ INT32 OpenSSLProxy_MgrInit()
 		goto ErrorHandle;
 	}
 
-	
+	g_pstMgrCtx->pstClientDispatchCtx = OpensslProxy_DispatchPackCtxCreate();
+	if (NULL == g_pstMgrCtx->pstClientDispatchCtx )
+	{
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Driver create the dispatch context error=%08x!\n", GetLastError());
+		goto ErrorHandle;
+	}
 
+	g_pstMgrCtx->pstWorkerCtx = OpensslProxy_NetworkEventWorkerCreate();
+	if (NULL == g_pstMgrCtx->pstWorkerCtx)
+	{
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Driver create the Network context error=%08x!\n", GetLastError());
+		goto ErrorHandle;
+	}
 
 	return SYS_OK;
 
 ErrorHandle:
 
+	if ( NULL != g_pstMgrCtx )
+	{
+		if (NULL != g_pstMgrCtx->pstClientDispatchCtx)
+		{
+			OpensslProxy_DispatchPackCtxRelease(g_pstMgrCtx->pstClientDispatchCtx);
+			g_pstMgrCtx->pstClientDispatchCtx = NULL;
+		}
+
+		if (NULL != g_pstMgrCtx->pstWorkerCtx)
+		{
+			OpensslProxy_NetworkEventWorkerRelease(g_pstMgrCtx->pstWorkerCtx);
+			g_pstMgrCtx->pstWorkerCtx = NULL;
+		}
+
+		free(g_pstMgrCtx);
+		g_pstMgrCtx = NULL;
+	}
 
 	OpenSSLProxy_SockUnInit();
 	return SYS_ERR;

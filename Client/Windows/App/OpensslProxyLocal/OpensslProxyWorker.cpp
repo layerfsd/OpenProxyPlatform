@@ -16,6 +16,33 @@
 
 
 
+WORKER_CTX_S *OpensslProxy_NetworkEventWorkerCreate()
+{
+	WORKER_CTX_S *pstWorker = NULL;
+
+	pstWorker = (WORKER_CTX_S *)malloc(sizeof(WORKER_CTX_S));
+	if (NULL == pstWorker)
+	{
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "malloc worker context error!\n");
+		return NULL;
+	}
+
+	RtlZeroMemory(pstWorker, sizeof(WORKER_CTX_S));
+
+
+	return pstWorker;
+}
+
+
+VOID OpensslProxy_NetworkEventWorkerRelease(PWORKER_CTX_S pstWorker)
+{
+	if (NULL == pstWorker)
+	{
+		free(pstWorker);
+	}
+}
+
+
 
 
 

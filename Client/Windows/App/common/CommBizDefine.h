@@ -39,6 +39,7 @@ typedef struct tagSockNetworkEvent
 /*每个线程都有该管理器*/
 typedef struct tagSocketMgr
 {
+	HANDLE				hThreadHandle;								/*线程句柄*/
 	UINT32				uiMgrCtxIndex;								/*所在管理器数组索引, 找原来的线程时候需要*/
 	SOCKET				sMsgUdpPort;									/*简单通信的FD, 本地消息端口矩阵,  直接用UDP通信, 仅用于少量消息的线程间通信(大量时会不可靠)*/
 	SOCKINFO_S		stArrySockInfo[WSAEVT_NUMS];	/*管理的Socket信息， 通过索引管理，这样就可以和网络事件复用相同索引，提高查找效率*/

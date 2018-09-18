@@ -22,8 +22,22 @@
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "OpensslProxyDrvCtrl.lib")
 
-int main()
+int main(int argc, char *argv[])
 {
+    UINT32          uiIPAddr   = 0;
+    UINT32          uiIPPort    = 0;
+
+    if (argc < 2 )
+    {
+        printf("Usage: OpensslProxyLocal.exe  ipaddr port\n");
+        return -1;
+    }
+    else
+    {
+        uiIPAddr = atoi(argv[1]);
+        uiIPPort = atoi(argv[2]);
+    }
+
 	/*1. 需要先初始化驱动库*/
 	if ( FALSE == OpenSSLProxy_DrvCtrl_EnvLibInit())
 	{
@@ -46,8 +60,22 @@ int main()
 		CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***INIT***: Local Proxy Manager Init  OK!");
 	}
 
+    if ( SYS_ERR == OpenSSLProxy_DrvCtrl_SetRuleIPAddr(uiIPAddr, uiIPPort) )
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Set ip-addr and Port error!\n");
+        goto Exit;
+    }
 
-
+    /*启动规则匹配*/
+    if ( TRUE == OpenSSLProxy_DrvCtrl_RuleMatchEnable() )
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Rule enable error!\n");
+        goto Exit;
+    }
+    else
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***INIT***: Rule match enable successful!");
+    }
 	system("pause");
 Exit:
 	OpenSSLProxy_DrvCtrl_EnvLibUnInit();

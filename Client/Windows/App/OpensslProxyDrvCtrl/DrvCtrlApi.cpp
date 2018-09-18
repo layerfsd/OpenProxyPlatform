@@ -27,7 +27,14 @@ BOOLEAN	OpenSSLProxy_DrvCtrl_EnvLibInit()
 			CLOG_writelog_level("DEVCTL", CLOG_LEVEL_ERROR, "Open Device Handle error!");
 			return FALSE;
 		}
-
+        else
+        {
+            if ( FALSE == g_pstDevIoCtrl ->ClearRuleIPAddr() )
+            {
+                CLOG_writelog_level("DEVCTL", CLOG_LEVEL_ERROR, "Clear Rule IP-Addr error!");
+                return FALSE;
+            }
+        }
 		return TRUE;
 	}
 
@@ -67,7 +74,6 @@ BOOLEAN OpenSSLProxy_DrvCtrl_RuleMatchDisable()
 	return FALSE;
 }
 
-
 BOOLEAN	OpenSSLProxy_DrvCtrl_SetLocalProxyInfo(UINT32 uiPID, UINT32 uiTcpPort)
 {
 	if (NULL != g_pstDevIoCtrl)
@@ -77,6 +83,57 @@ BOOLEAN	OpenSSLProxy_DrvCtrl_SetLocalProxyInfo(UINT32 uiPID, UINT32 uiTcpPort)
 	return FALSE;
 }
 
+BOOLEAN       OpenSSLProxy_DrvCtrl_SetRuleIPAddr(UINT32 uiIPAddr, UINT32 uiIPPort)
+{
+    if (NULL != g_pstDevIoCtrl)
+    {
+        return g_pstDevIoCtrl->SetRuleIPAddr(uiIPAddr, uiIPPort);
+    }
+    return FALSE;
+}
+
+BOOLEAN       OpenSSLProxy_DrvCtrl_DelRuleIPAddr(UINT32 uiIPAddr, UINT32 uiIPPort)
+{
+    if (NULL != g_pstDevIoCtrl)
+    {
+        return g_pstDevIoCtrl->DelRuleIPAddr(uiIPAddr, uiIPPort);
+    }
+    return FALSE;
+}
+BOOLEAN       OpenSSLProxy_DrvCtrl_ClearRuleIPAddr()
+{
+    if (NULL != g_pstDevIoCtrl)
+    {
+        return g_pstDevIoCtrl->ClearRuleIPAddr();
+    }
+    return FALSE;
+}
+BOOLEAN       OpenSSLProxy_DrvCtrl_ClearRuleIPAddrWithType(UINT32 uiType)
+{
+    if (NULL != g_pstDevIoCtrl)
+    {
+        return g_pstDevIoCtrl->ClearRuleIPAddrWithType(uiType);
+    }
+    return FALSE;
+}
+
+BOOLEAN       OpenSSLProxy_DrvCtrl_SetLocalPortRange(UINT32 uiLocalStart, UINT32 uiLocalEnd)
+{
+    if (NULL != g_pstDevIoCtrl)
+    {
+        return g_pstDevIoCtrl->SetLocalPortRange(uiLocalStart, uiLocalEnd);
+    }
+    return FALSE;
+}
+
+UINT32           OpenSSLProxy_DrvCtrl_GetLocalPortRange(CHAR *pcBuf, INT32 uiBufLen)
+{
+    if (NULL != g_pstDevIoCtrl)
+    {
+        return g_pstDevIoCtrl->GetLocalPortRange(pcBuf, uiBufLen);
+    }
+    return FALSE;
+}
 
 
 

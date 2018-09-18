@@ -28,12 +28,26 @@
 
 
 /*单个线程最大的WSAEventSelect数量, 一个保留，一个用于通信的UDP*/
-#define WSAEVT_NUMS		MAXIMUM_WAIT_OBJECTS	-2
+#define		WSAEVT_NUMS		        MAXIMUM_WAIT_OBJECTS	-2
 /*当前全局的最多创建的线程个数*/
-#define MGR_ARRYNUMS			128
+#define		MGR_ARRYNUMS           128
 
 /*建立64位的GUID的唯一连接标识码, 统一根据标识码进行管理*/
-#define MGR_GUIDLEN				64
+#define		MGR_GUIDLEN                 64
+
+/*自定义运行栈大小*/
+#define		MGR_STACKSIZE               256*1024
+
+/*监听的队列*/
+#define		MGR_LISTENUMS               50
+
+/*本地字符串*/
+#define		MGR_LOCALADDRA          "127.0.0.1"
+/*地址长度*/
+#define		MGR_IPV4LEN                     32
+/*默认的本地监听端口*/
+#define		MGR_LISTENPORT              9890
+
 
 /***************************内联的链表操作*******************************************/
 #define CONTAINING_RECORD(address, type, field) ((type *)( \

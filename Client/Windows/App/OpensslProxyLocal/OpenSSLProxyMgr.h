@@ -1,10 +1,5 @@
 #pragma once
 
-/*默认的本地监听端口*/
-#define		MGR_LISTENPORT		9890
-
-
-
 /*上下文管理器*/
 typedef struct tagMgrContext
 {
