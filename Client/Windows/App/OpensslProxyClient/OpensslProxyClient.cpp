@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 	serveraddr.sin_addr = ipaddr;
 
 	if (connect(sockfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) != 0) {
-		printf("[SSL-Client]: Error-->connect error!\n");
+		printf("[SSL-Client]: Error-->connect error=%08x!\n", GetLastError() );
 		goto ErrorExit;
 	}
 

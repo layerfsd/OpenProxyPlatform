@@ -32,29 +32,31 @@ SOCKET OpensslProxy_SocketWithTcpPort(USHORT usPort)
 	}
 
 	//stSockaddr.sin_addr.S_un.S_addr = inet_addr(MGR_LOCALADDRA);
-    inet_pton(AF_INET, MGR_LOCALADDRA, &stSockaddr.sin_addr);
+    stSockaddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+    //stSockaddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+    //inet_pton(AF_INET, MGR_LOCALADDRA, &stSockaddr.sin_addr);
 	stSockaddr.sin_family = AF_INET;
 	stSockaddr.sin_port = htons(usPort);
 
-    /*独占方式*/
+    /*端口独占和端口复用是不能够一起使用的，提示无效参数*/
+#if 0
     iRead = setsockopt(sSeverSock,
-		SOL_SOCKET,
-		SO_EXCLUSIVEADDRUSE,
-		(char*)&iOptval,
-		sizeof(iOptval));
-	if (iRead == SOCKET_ERROR)
-	{
-		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "tcp socket set sockreuse error=%d, usPort=%d\n", GetLastError(), usPort);
-        closesocket(sSeverSock);
-		return INVALID_SOCKET;
-	}
+        SOL_SOCKET,
+        SO_EXCLUSIVEADDRUSE,
+        (char*)&iOptval,
+        sizeof(iOptval));
+    if (iRead == SOCKET_ERROR)
+    {
+        CLOG_writelog_level("TCPSEV", CLOG_LEVEL_ERROR, "tcp socket set SO_EXCLUSIVEADDRUSE error=%d, usPort=%d", GetLastError(), usPort);
+        return INVALID_SOCKET;
+    }
+#endif
 
-	if (SOCKET_ERROR != setsockopt(sSeverSock, SOL_SOCKET, SO_REUSEADDR, (char *)&iOptval, sizeof(iOptval)))
-	{
-        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "tcp socket set sockreuse error=%d, usPort=%d\n", GetLastError(), usPort);
-        closesocket(sSeverSock);
-		return INVALID_SOCKET;
-	}
+    if (SOCKET_ERROR == setsockopt(sSeverSock, SOL_SOCKET, SO_REUSEADDR, (char *)&iOptval, sizeof(iOptval)))
+    {
+        CLOG_writelog_level("TCPSEV", CLOG_LEVEL_ERROR, "tcp socket set SO_REUSEADDR error=%d, usPort=%d", GetLastError(), usPort);
+        return INVALID_SOCKET;
+    }
 
     iError = bind(sSeverSock, (struct sockaddr *)&stSockaddr, iSocklen);
 	if (0 != iError)
@@ -99,7 +101,10 @@ unsigned int __stdcall OpensslProxy_LocalAccept(PVOID pvArg)
         SetEvent(pstPackDispatch->hCompleteEvent);
         return -1;
     }
-	
+    
+    pstPackDispatch->stServerInfo.sSockfd = sSockfd;
+    pstPackDispatch->stServerInfo.usPort   = usPort;
+
 	SetEvent(pstPackDispatch->hCompleteEvent);
 	
     while (true)
@@ -110,18 +115,20 @@ unsigned int __stdcall OpensslProxy_LocalAccept(PVOID pvArg)
             CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "malloc new client info error=%08x!\n", GetLastError() );
             break;
         }
-
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "Wait for a new client come in....\n");
+        printf("Wait for new client come in...\n");
         pstPackDispatch->pstClientInfo->sLocalFD = accept(sSockfd, (struct sockaddr *)&pstPackDispatch->pstClientInfo->stLocalInfo, &isocklen);
         if (INVALID_SOCKET != pstPackDispatch->pstClientInfo->sLocalFD)
         {
             inet_ntop(AF_INET, &pstPackDispatch->pstClientInfo->stLocalInfo.sin_addr, acAddr, MGR_IPV4LEN);
             usClientPort = ntohs(pstPackDispatch->pstClientInfo->stLocalInfo.sin_port);
             CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "New Local client info=%s:%d!\n", acAddr, usClientPort);
-
+            printf("new client : [%s:%d]\n", acAddr, usClientPort);
             closesocket(pstPackDispatch->pstClientInfo->sLocalFD);
         }
         else
         {
+            printf("accept error=%08x!\n", GetLastError());
             CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "accept error=%08x!\n", GetLastError());
             free(pstPackDispatch->pstClientInfo);
             pstPackDispatch->pstClientInfo = NULL;
@@ -162,6 +169,9 @@ DISPATCHPACK_CTX_S *OpensslProxy_DispatchPackCtxCreate()
 	hThreadHandle = _beginthreadex(NULL, dwStatckSize, OpensslProxy_LocalAccept, pstPackDispatch, 0, NULL);
 
     WaitForSingleObject(pstPackDispatch->hCompleteEvent, INFINITE);
+
+    CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***INIT***: Local Server Start successful! Socket=%d, port=%d\n", 
+        pstPackDispatch->stServerInfo.sSockfd, pstPackDispatch->stServerInfo.usPort);
 
 	return pstPackDispatch;
 }

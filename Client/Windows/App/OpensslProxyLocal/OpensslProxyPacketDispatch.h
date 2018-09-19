@@ -9,6 +9,12 @@ typedef enum
 	PROXY_BLANCEALGM_NUMS
 }PROXY_BLANALGM_E;
 
+typedef struct tagLocalServerInfo
+{
+    SOCKET           sSockfd;
+    USHORT          usPort;
+    UINT32            uiPID; 
+}LOCAL_SEVINFO_S,*PLOCAL_SEVINFO_S;
 
 /*新来的本地的socket信息*/
 typedef struct tagLocalSockInfo
@@ -22,6 +28,7 @@ typedef struct tagDispatchPackContext
 {
 	HANDLE				    hThreadHandle;		/*线程等待句柄*/
 	HANDLE				    hCompleteEvent;		/*完成事件*/
+    LOCAL_SEVINFO_S  stServerInfo;            /*监听先放在本线程*/
 	PCLIENT_INFO_S	    pstClientInfo;			/*新的客户端连接信息*/
 	ULONG				    ulBlanceAlgm;			/*分发的均衡算法*/
 }DISPATCHPACK_CTX_S, *PDISPATCHPACK_CTX_S;

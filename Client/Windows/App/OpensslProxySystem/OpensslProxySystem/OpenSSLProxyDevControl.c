@@ -81,7 +81,7 @@ NTSTATUS DeviceIoControl(
 					else
 					{
 						KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device add rule info successful! [%08x:%d]!\n",
-							pRuleInfo->uiRuleIPAddr, pRuleInfo->uiRulePort));
+							ntohl(pRuleInfo->uiRuleIPAddr), ntohs(pRuleInfo->uiRulePort)));
 					}
 				}
 			}

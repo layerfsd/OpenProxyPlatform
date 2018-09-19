@@ -27,6 +27,8 @@ int main(int argc, char *argv[])
     UINT32          uiIPAddr   = 0;
     UINT32          uiIPPort    = 0;
     struct in_addr stIpAddr = {0};
+
+
     if (argc < 2 )
     {
         printf("Usage: OpensslProxyLocal.exe  ipaddr port\n");
@@ -51,6 +53,21 @@ int main(int argc, char *argv[])
 		CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***INIT***: OpenSSLProxy Driver enviroment Init OK!");
 	}
 
+
+    if (SYS_ERR == OpenSSLProxy_DrvCtrl_SetRuleIPAddr(uiIPAddr, uiIPPort))
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Set ip-addr and Port error!\n");
+        goto Exit;
+    }
+
+#if 0
+    if  (SYS_ERR == OpenSSLProxy_DrvCtrl_SetLocalPortRange(5000, 65000))
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Set ip-addr and Port error!\n");
+        goto Exit;
+    }
+#endif
+
 	/*2. 初始化管理器*/
 	if ( SYS_ERR == OpenSSLProxy_MgrInit() )
 	{
@@ -59,17 +76,11 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-		CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***INIT***: Local Proxy Manager Init  OK!");
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***INIT***: Local Proxy Manager Init  successful!");
 	}
 
-    if ( SYS_ERR == OpenSSLProxy_DrvCtrl_SetRuleIPAddr(uiIPAddr, uiIPPort) )
-    {
-        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Set ip-addr and Port error!\n");
-        goto Exit;
-    }
-
     /*启动规则匹配*/
-    if ( FALSE == OpenSSLProxy_DrvCtrl_RuleMatchEnable() )
+    if (FALSE == OpenSSLProxy_DrvCtrl_RuleMatchEnable())
     {
         CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Rule enable error!\n");
         goto Exit;
