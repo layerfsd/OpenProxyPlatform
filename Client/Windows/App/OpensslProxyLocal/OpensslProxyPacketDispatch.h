@@ -30,7 +30,6 @@ typedef struct tagDispatchPackContext
 	HANDLE				    hCompleteEvent;		/*完成事件*/
     INT32                      iErrorCode;              /*线程错误码*/
     LOCAL_SEVINFO_S  stServerInfo;            /*监听先放在本线程*/
-	PCLIENT_INFO_S	    pstClientInfo;			/*新的客户端连接信息*/
 	ULONG				    ulBlanceAlgm;			/*分发的均衡算法*/
 }DISPATCHPACK_CTX_S, *PDISPATCHPACK_CTX_S;
 

@@ -14,6 +14,7 @@
 #include "OpenSSLProxyMgr.h"
 
 
+
 SOCKET OpensslProxy_SocketWithTcpPort(USHORT usPort)
 {
 	SOCKET					sSeverSock = INVALID_SOCKET;
@@ -86,6 +87,7 @@ unsigned int __stdcall OpensslProxy_LocalAccept(PVOID pvArg)
     USHORT      usClientPort    = 0;
     CHAR           acAddr[MGR_IPV4LEN] = {0};
 	DISPATCHPACK_CTX_S *pstPackDispatch = (DISPATCHPACK_CTX_S *)pvArg;
+    CLIENT_INFO_S              stNewClientInfo = {0};
 
 	if (NULL == pvArg)
 	{
@@ -106,31 +108,28 @@ unsigned int __stdcall OpensslProxy_LocalAccept(PVOID pvArg)
     pstPackDispatch->stServerInfo.usPort   = usPort;
 
 	SetEvent(pstPackDispatch->hCompleteEvent);
-	
+
     while (true)
     {
-        pstPackDispatch->pstClientInfo = (PCLIENT_INFO_S)malloc(sizeof(CLIENT_INFO_S));
-        if (NULL == pstPackDispatch)
-        {
-            CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "malloc new client info error=%08x!", GetLastError() );
-            break;
-        }
+        RtlZeroMemory(&stNewClientInfo, sizeof(stNewClientInfo));
 
-        pstPackDispatch->pstClientInfo->sLocalFD = accept(sSockfd, (struct sockaddr *)&pstPackDispatch->pstClientInfo->stLocalInfo, &isocklen);
-        if (INVALID_SOCKET != pstPackDispatch->pstClientInfo->sLocalFD)
+        stNewClientInfo.sLocalFD = accept(sSockfd, (struct sockaddr *)&stNewClientInfo.stLocalInfo, &isocklen);
+        if (INVALID_SOCKET != stNewClientInfo.sLocalFD)
         {
-            inet_ntop(AF_INET, &pstPackDispatch->pstClientInfo->stLocalInfo.sin_addr, acAddr, MGR_IPV4LEN);
-            usClientPort = ntohs(pstPackDispatch->pstClientInfo->stLocalInfo.sin_port);
+            inet_ntop(AF_INET, &stNewClientInfo.stLocalInfo.sin_addr, acAddr, MGR_IPV4LEN);
+            usClientPort = ntohs(stNewClientInfo.stLocalInfo.sin_port);
             CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "Accept a new Local client info=%s:%d!", acAddr, usClientPort);
             
+            if ( SYS_ERR == OpensslProxy_DispatchNetworkByBlanceAlgm(stNewClientInfo.sLocalFD, pstPackDispatch->ulBlanceAlgm) )
+            {
+                continue;
+            }
 
         }
         else
         {
             printf("accept error=%08x!\n", GetLastError());
             CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "accept error=%08x!", GetLastError());
-            free(pstPackDispatch->pstClientInfo);
-            pstPackDispatch->pstClientInfo = NULL;
             break;
         }
 	}

@@ -13,6 +13,9 @@
 #include "OpensslProxyWorker.h"
 #include "OpensslProxyPacketDispatch.h"
 #include "OpenSSLProxyMgr.h"
+#include "OpensslProxyMsgCtrl.h"
+
+/******************************************PerSocket的信息********************************************************/
 
 INT32       OpensslProxy_SockEventDel(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex);
 
@@ -289,6 +292,53 @@ VOID OpensslProxy_SockMgrRelease(SOCK_MGR_S *pstSockMgr)
     }
 }
 
+/**********************************************Worker总的上下文的管理器************************************************************/
+/*根据算法派发相关的ClientSocket*/
+INT32 OpensslProxy_DispatchNetworkByBlanceAlgm(SOCKET sNewClientFd, UINT32 uiBlanceAlgm)
+{
+
+
+
+    return SYS_ERR;
+}
+
+
+unsigned int __stdcall OpensslProxy_WorkerMsgCtrl(PVOID pvArg)
+{
+    WORKER_CTX_S *pstWorker = NULL;
+    CHAR                  acMsg[MCTL_BUFSIZE] = {0};
+    struct  sockaddr_in stClientInfo = { 0 };
+    INT32                   iLen = sizeof(stClientInfo);
+    INT32                   iRet = 0;
+
+    if (NULL == pvArg)
+    {
+        return -1;
+    }
+
+    pstWorker = (WORKER_CTX_S *)pvArg;
+
+    while (1)
+    {
+        RtlZeroMemory(acMsg, MCTL_BUFSIZE);
+        iRet = recvfrom(pstWorker->sMsgCtrlSockFd, acMsg, MCTL_BUFSIZE, 0, (struct sockaddr*)&stClientInfo, &iLen);
+        if (iRet < 0)
+        {
+            CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "worker msg ctrl udps recvfrom message error=%08x!", GetLastError());
+            break;
+        }
+        else
+        {
+            if ( SYS_ERR == OpensslProxy_MessageCtrlMain(acMsg,  iRet) )
+            {
+                CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "worker msg ctrl udps message handler error!");
+            }
+        }
+    }
+
+    return 0;
+}
+
 WORKER_CTX_S *OpensslProxy_NetworkEventWorkerCreate()
 {
 	WORKER_CTX_S *pstWorker = NULL;
@@ -311,17 +361,30 @@ WORKER_CTX_S *OpensslProxy_NetworkEventWorkerCreate()
 
     pstWorker->uiWorkerNums = MSG_UDPPORT_START;
 
-    /*默认先创建一个*/
-    pstWorker->pstArryWorker[uiIndex] = OpensslProxy_SockMgrCreate(pstWorker, uiIndex);
-    if (NULL == pstWorker->pstArryWorker[uiIndex] )
+
+    /*创建UDP通信端口*/
+    pstWorker->sMsgCtrlSockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (INVALID_SOCKET == pstWorker->sMsgCtrlSockFd)
     {
-        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "create socket manager error!");
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "msg udp socket create error=%d", GetLastError());
         DeleteCriticalSection(&pstWorker->stWorkerLock);
         free(pstWorker);
         return NULL;
     }
 
+    /*直接创建消息线程, 简单的消息控制，不可靠，需要添加可靠队列*/
+    _beginthreadex(NULL, 0, OpensslProxy_WorkerMsgCtrl, pstWorker, 0, NULL);
 
+    /*默认先创建一个*/
+    pstWorker->pstArryWorker[uiIndex] = OpensslProxy_SockMgrCreate(pstWorker, uiIndex);
+    if (NULL == pstWorker->pstArryWorker[uiIndex] )
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "create socket manager error!");
+        closesocket(pstWorker->sMsgCtrlSockFd);
+        DeleteCriticalSection(&pstWorker->stWorkerLock);
+        free(pstWorker);
+        return NULL;
+    }
 
 	return pstWorker;
 }
