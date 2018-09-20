@@ -28,7 +28,8 @@
 UINT32					g_uiConnectRedirectCalloutIdV4 = 0;
 HANDLE					g_hRedirectHandle			= NULL;
 
-
+//²Î¿¼
+//https://technet.microsoft.com/zh-cn/ff571005(v=vs.94)
 VOID OpenSSLProxy_ConnectionRedirectClassify(
 	IN const FWPS_INCOMING_VALUES*						inFixedValues,
 	IN const FWPS_INCOMING_METADATA_VALUES* inMetaValues,
@@ -51,7 +52,7 @@ VOID OpenSSLProxy_ConnectionRedirectClassify(
 	UINT8			Protocol = inFixedValues->incomingValue[FWPS_FIELD_ALE_CONNECT_REDIRECT_V4_IP_PROTOCOL].value.uint8;
 	UINT32		remoteipaddr = 0;
 	USHORT		remotePort = 0;
-//	UINT32		timesRedirected = 0;
+	UINT32		timesRedirected = 0;
 	UINT32		localipaddr = 0;
 	USHORT		localport = 0;
 
@@ -123,9 +124,6 @@ VOID OpenSSLProxy_ConnectionRedirectClassify(
 		goto Exit;
 	}
 
-    pConnectRequest = (FWPS_CONNECT_REQUEST*)WriteableLayerData;
-#if 0
-
 	if (inFixedValues->incomingValue[FWPS_FIELD_ALE_CONNECT_REDIRECT_V4_FLAGS].value.uint32 & FWP_CONDITION_FLAG_IS_REAUTHORIZE)
 	{
 		pConnectRequest = ((FWPS_CONNECT_REQUEST*)(WriteableLayerData))->previousVersion;
@@ -137,8 +135,7 @@ VOID OpenSSLProxy_ConnectionRedirectClassify(
 			goto Exit;
 		}
 	}
-#endif
-#if 0
+
 	for (pConnectRequest = ((FWPS_CONNECT_REQUEST*)(WriteableLayerData))->previousVersion;
 		pConnectRequest;
 		pConnectRequest = pConnectRequest->previousVersion)
@@ -152,9 +149,8 @@ VOID OpenSSLProxy_ConnectionRedirectClassify(
 			goto Exit;
 		}
 	}
-#endif
 
-	
+    pConnectRequest = (FWPS_CONNECT_REQUEST*)WriteableLayerData;
 
 #if(NTDDI_VERSION >= NTDDI_WIN8)
     /// Set redirectHandle only if proxying locally
@@ -193,10 +189,8 @@ VOID OpenSSLProxy_ConnectionRedirectClassify(
 
 	if ( TRUE == OpenSSLProxy_RuleIsMatch(remoteipaddr, remotePort) )
 	{
-
-        KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Before|| Redirect Rule Matched: [pto=%02d] %08x:%d --> %08x:%d,NetPID=%d, LocalProxy:[pid=%d, 127.0.0.1:%d]\n",
-            Protocol, ntohl(localipaddr), ntohs(localport), ntohl(remoteipaddr), ntohs(remotePort), ProcessID, OpenSSLProxy_GetLocalProxyPID(), OpenSSLProxy_GetLocalProxyPort()));
-
+        /*KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Before|| Redirect Rule Matched: [pto=%02d] %08x:%d --> %08x:%d,NetPID=%d, LocalProxy:[pid=%d, 127.0.0.1:%d]\n",
+            Protocol, ntohl(localipaddr), ntohs(localport), ntohl(remoteipaddr), ntohs(remotePort), ProcessID, OpenSSLProxy_GetLocalProxyPID(), ntohs(OpenSSLProxy_GetLocalProxyPort())));*/
 		if (INETADDR_ISANY((PSOCKADDR)&(pConnectRequest->localAddressAndPort)))
 		{
 			INETADDR_SETLOOPBACK((PSOCKADDR)&(pConnectRequest->remoteAddressAndPort));
@@ -215,13 +209,13 @@ VOID OpenSSLProxy_ConnectionRedirectClassify(
         localipaddr = ((PSOCKADDR_IN)&(pConnectRequest->localAddressAndPort))->sin_addr.S_un.S_addr;
         localport = ((PSOCKADDR_IN)&(pConnectRequest->localAddressAndPort))->sin_port;
 
-        KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->After || Redirect Rule Matched: [pto=%02d] %08x:%d --> %08x:%d,NetPID=%d, LocalProxy:[pid=%d, 127.0.0.1:%d]\n",
-            Protocol, ntohl(localipaddr), ntohs(localport), ntohl(remoteipaddr), ntohs(remotePort), ProcessID, OpenSSLProxy_GetLocalProxyPID(), OpenSSLProxy_GetLocalProxyPort()));
+        KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Redirect Rule Matched: [pto=%02d] %08x:%d --> %08x:%d,NetPID=%d, LocalProxy:[pid=%d, 127.0.0.1:%d]\n",
+            Protocol, ntohl(localipaddr), ntohs(localport), ntohl(remoteipaddr), ntohs(remotePort), ProcessID, OpenSSLProxy_GetLocalProxyPID(), ntohs(OpenSSLProxy_GetLocalProxyPort())));
 	}
     else
     {
 #if  DBG
-        KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Not Match Any Rule List! IPAddrInfo=%08x:%d\n", ntohl(remoteipaddr), ntohs(remotePort)));
+       KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Not Match Any Rule List! IPAddrInfo=%08x:%d\n", ntohl(remoteipaddr), ntohs(remotePort)));
 #endif
     }
 

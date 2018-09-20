@@ -26,8 +26,9 @@ typedef struct tagLocalSockInfo
 /*分派转发包处理: TODO: 可以做一些过滤的操作*/
 typedef struct tagDispatchPackContext
 {
-	HANDLE				    hThreadHandle;		/*线程等待句柄*/
+    uintptr_t				    hThreadHandle;		/*线程等待句柄*/
 	HANDLE				    hCompleteEvent;		/*完成事件*/
+    INT32                      iErrorCode;              /*线程错误码*/
     LOCAL_SEVINFO_S  stServerInfo;            /*监听先放在本线程*/
 	PCLIENT_INFO_S	    pstClientInfo;			/*新的客户端连接信息*/
 	ULONG				    ulBlanceAlgm;			/*分发的均衡算法*/

@@ -8,10 +8,11 @@ typedef struct tagCommIoBuf
 	UCHAR								acBuf[IOBUF_MAXSIZE];					/*内存大小*/
 	UINT32							uiBufSize;											/*投递的内存大小*/
 	UINT32							uiDatalen;										/*数据长度*/
-}COM_IOBUF, *PCOM_IOBUF;
+}COM_IOBUF_S, *PCOM_IOBUF_S;
 
 
-COM_IOBUF* COMM_IOBUF_Create();
+COM_IOBUF_S* COMM_IOBUF_Create();
 
-VOID COMM_IOBUF_Free(COM_IOBUF* pstIoBuf);
+VOID COMM_IOBUF_Free(COM_IOBUF_S* pstIoBuf);
 
+VOID COMM_IOBUF_BufListRelease(PLIST_ENTRY pstList);

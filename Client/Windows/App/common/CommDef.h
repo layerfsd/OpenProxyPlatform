@@ -25,10 +25,13 @@
 #endif
 
 /******************************************************************************/
+#define     MGR_ERRCODE_SUCCESS          0
+#define     MGR_ERRCODE_PARAM            -1
+#define     MGR_ERRCODE_TIMEOUT         -2
 
-
-/*单个线程最大的WSAEventSelect数量, 一个保留，一个用于通信的UDP*/
-#define		WSAEVT_NUMS		        MAXIMUM_WAIT_OBJECTS	-2
+/******************************************************************************/
+/*单个线程最大的WSAEventSelect数量,  一个保留，一个用于通信的UDP*/
+#define		WSAEVT_NUMS		        MAXIMUM_WAIT_OBJECTS	
 /*当前全局的最多创建的线程个数*/
 #define		MGR_ARRYNUMS           128
 
@@ -60,6 +63,14 @@ FORCEINLINE VOID InitializeListHead(
 {
 	ListHead->Flink = ListHead->Blink = ListHead;
 	return;
+}
+
+BOOLEAN CFORCEINLINE IsListEmpty(
+    _In_ const LIST_ENTRY * ListHead
+)
+{
+
+    return (BOOLEAN)(ListHead->Flink == ListHead);
 }
 
 FORCEINLINE BOOLEAN RemoveEntryList(

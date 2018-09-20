@@ -18,7 +18,7 @@ SOCKET OpensslProxy_SocketWithTcpPort(USHORT usPort)
 {
 	SOCKET					sSeverSock = INVALID_SOCKET;
 	SOCKADDR_IN		stSockaddr = { 0 };
-	size_t						iSocklen	= sizeof(SOCKADDR_IN);
+	INT32						iSocklen	= sizeof(SOCKADDR_IN);
 	INT32						iError	    = 0;
 	BOOL						bVal			= TRUE;
 	int							iOptval		= 1;
@@ -27,14 +27,14 @@ SOCKET OpensslProxy_SocketWithTcpPort(USHORT usPort)
 	sSeverSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (INVALID_SOCKET == sSeverSock)
 	{
-		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "tcp socket create error=%d\n", GetLastError());
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "tcp socket create error=%d", GetLastError());
 		return INVALID_SOCKET;
 	}
 
 	//stSockaddr.sin_addr.S_un.S_addr = inet_addr(MGR_LOCALADDRA);
-    stSockaddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
+    //stSockaddr.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
     //stSockaddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
-    //inet_pton(AF_INET, MGR_LOCALADDRA, &stSockaddr.sin_addr);
+    inet_pton(AF_INET, MGR_LOCALADDRA, &stSockaddr.sin_addr);
 	stSockaddr.sin_family = AF_INET;
 	stSockaddr.sin_port = htons(usPort);
 
@@ -61,14 +61,14 @@ SOCKET OpensslProxy_SocketWithTcpPort(USHORT usPort)
     iError = bind(sSeverSock, (struct sockaddr *)&stSockaddr, iSocklen);
 	if (0 != iError)
 	{
-        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "tcp socket bind error=%d, usPort=%d\n", GetLastError(), usPort);
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "tcp socket bind error=%d, usPort=%d", GetLastError(), usPort);
         closesocket(sSeverSock);
         return INVALID_SOCKET;
 	}
 
 	if (0 != listen(sSeverSock, MGR_LISTENUMS))
 	{
-        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "tcp socket listen error=%d,  usPort=%d\n", GetLastError(), usPort);
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "tcp socket listen error=%d,  usPort=%d", GetLastError(), usPort);
         closesocket(sSeverSock);
 		return INVALID_SOCKET;
 	}
@@ -89,7 +89,7 @@ unsigned int __stdcall OpensslProxy_LocalAccept(PVOID pvArg)
 
 	if (NULL == pvArg)
 	{
-		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "thread param error!\n");
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "thread param error!");
         SetEvent(pstPackDispatch->hCompleteEvent);
         return -1;
 	}
@@ -97,7 +97,7 @@ unsigned int __stdcall OpensslProxy_LocalAccept(PVOID pvArg)
     sSockfd = OpensslProxy_SocketWithTcpPort(usPort);
     if (INVALID_SOCKET == sSockfd )
     {
-        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "create tcp server socket error!\n");
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "create tcp server socket error!");
         SetEvent(pstPackDispatch->hCompleteEvent);
         return -1;
     }
@@ -112,24 +112,23 @@ unsigned int __stdcall OpensslProxy_LocalAccept(PVOID pvArg)
         pstPackDispatch->pstClientInfo = (PCLIENT_INFO_S)malloc(sizeof(CLIENT_INFO_S));
         if (NULL == pstPackDispatch)
         {
-            CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "malloc new client info error=%08x!\n", GetLastError() );
+            CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "malloc new client info error=%08x!", GetLastError() );
             break;
         }
-        CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "Wait for a new client come in....\n");
-        printf("Wait for new client come in...\n");
+
         pstPackDispatch->pstClientInfo->sLocalFD = accept(sSockfd, (struct sockaddr *)&pstPackDispatch->pstClientInfo->stLocalInfo, &isocklen);
         if (INVALID_SOCKET != pstPackDispatch->pstClientInfo->sLocalFD)
         {
             inet_ntop(AF_INET, &pstPackDispatch->pstClientInfo->stLocalInfo.sin_addr, acAddr, MGR_IPV4LEN);
             usClientPort = ntohs(pstPackDispatch->pstClientInfo->stLocalInfo.sin_port);
-            CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "New Local client info=%s:%d!\n", acAddr, usClientPort);
-            printf("new client : [%s:%d]\n", acAddr, usClientPort);
-            closesocket(pstPackDispatch->pstClientInfo->sLocalFD);
+            CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "Accept a new Local client info=%s:%d!", acAddr, usClientPort);
+            
+
         }
         else
         {
             printf("accept error=%08x!\n", GetLastError());
-            CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "accept error=%08x!\n", GetLastError());
+            CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "accept error=%08x!", GetLastError());
             free(pstPackDispatch->pstClientInfo);
             pstPackDispatch->pstClientInfo = NULL;
             break;
@@ -144,33 +143,43 @@ unsigned int __stdcall OpensslProxy_LocalAccept(PVOID pvArg)
 DISPATCHPACK_CTX_S *OpensslProxy_DispatchPackCtxCreate()
 {
 	DISPATCHPACK_CTX_S *pstPackDispatch = NULL;
-	uintptr_t							hThreadHandle  = 0;
 	DWORD							dwStatckSize = MGR_STACKSIZE;
 
 	pstPackDispatch = (DISPATCHPACK_CTX_S *)malloc(sizeof(DISPATCHPACK_CTX_S));
 	if (NULL == pstPackDispatch )
 	{
-		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "malloc dispatch ctx error!\n");
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Malloc dispatch ctx error!");
 		return NULL;
 	}
 
 	RtlZeroMemory(pstPackDispatch, sizeof(DISPATCHPACK_CTX_S));
+    pstPackDispatch->iErrorCode = MGR_ERRCODE_SUCCESS;
 
 	pstPackDispatch->hCompleteEvent =CreateEvent(NULL, FALSE, FALSE, NULL);
 	if (NULL == pstPackDispatch->hCompleteEvent )
 	{
-		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "dispatch ctx create complete event error!\n");
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Dispatch ctx create complete event error!");
 		free(pstPackDispatch);
 		pstPackDispatch = NULL;
 		return NULL;
 	}
 
 	/*直接在当前线程先创建Accept的本地服务端*/
-	hThreadHandle = _beginthreadex(NULL, dwStatckSize, OpensslProxy_LocalAccept, pstPackDispatch, 0, NULL);
+    pstPackDispatch->hThreadHandle = _beginthreadex(NULL, dwStatckSize, OpensslProxy_LocalAccept, pstPackDispatch, 0, NULL);
 
     WaitForSingleObject(pstPackDispatch->hCompleteEvent, INFINITE);
 
-    CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***INIT***: Local Server Start successful! Socket=%d, port=%d\n", 
+    /*表示线程初始化过程中存在问题，直接退出*/
+    if (pstPackDispatch->iErrorCode != MGR_ERRCODE_SUCCESS )
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Dispatch pthread init errorCode=%d", pstPackDispatch->iErrorCode);
+        CloseHandle(pstPackDispatch->hCompleteEvent);
+        free(pstPackDispatch);
+        pstPackDispatch = NULL;
+        return NULL;
+    }
+
+    CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***INIT***: Local Server Start successful! Socket=%d, port=%d", 
         pstPackDispatch->stServerInfo.sSockfd, pstPackDispatch->stServerInfo.usPort);
 
 	return pstPackDispatch;

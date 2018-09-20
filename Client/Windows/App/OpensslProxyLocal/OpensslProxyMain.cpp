@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 	/*1. 需要先初始化驱动库*/
 	if ( FALSE == OpenSSLProxy_DrvCtrl_EnvLibInit())
 	{
-		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Driver enviroment error!\n");
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Driver enviroment error!");
 		goto Exit;
 	}
 	else
@@ -53,25 +53,22 @@ int main(int argc, char *argv[])
 		CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "***INIT***: OpenSSLProxy Driver enviroment Init OK!");
 	}
 
-
     if (SYS_ERR == OpenSSLProxy_DrvCtrl_SetRuleIPAddr(uiIPAddr, uiIPPort))
     {
-        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Set ip-addr and Port error!\n");
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Set ip-addr and Port error!");
         goto Exit;
     }
 
-#if 0
-    if  (SYS_ERR == OpenSSLProxy_DrvCtrl_SetLocalPortRange(5000, 65000))
+    if  (SYS_ERR == OpenSSLProxy_DrvCtrl_SetLocalPortRange(60000, 65000))
     {
-        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Set ip-addr and Port error!\n");
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Set ip-addr and Port error!");
         goto Exit;
     }
-#endif
 
 	/*2. 初始化管理器*/
 	if ( SYS_ERR == OpenSSLProxy_MgrInit() )
 	{
-		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Driver enviroment error!\n");
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Driver enviroment error!");
 		goto Exit;
 	}
 	else
@@ -82,7 +79,7 @@ int main(int argc, char *argv[])
     /*启动规则匹配*/
     if (FALSE == OpenSSLProxy_DrvCtrl_RuleMatchEnable())
     {
-        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Rule enable error!\n");
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Rule enable error!");
         goto Exit;
     }
     else
