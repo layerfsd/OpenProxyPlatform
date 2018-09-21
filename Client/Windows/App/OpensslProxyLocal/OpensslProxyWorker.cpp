@@ -23,7 +23,83 @@ INT32       OpensslProxy_SockEventDel(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex)
 
 unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
 {
+    ULONG                    ulArrayIndex = 0;
+    INT32                       iRet = 0;
+    INT32                       iEvtIndex = 0;
+    INT32                       iError = 0;
+    SOCKET                    sSocket = INVALID_SOCKET;
+    SOCK_MGR_S*         pstSockMgr = NULL;
+    CHAR                       acRecvBuf[MSG_RECVBUF] = {0};
+    struct  sockaddr_in  stClientInfo = { 0 };
+    INT32                       iLen = sizeof(stClientInfo);
+    WSANETWORKEVENTS NetworkEvents = { 0 };
 
+    if (NULL == pvArgv)
+    {
+        return -1;
+    }
+
+    pstSockMgr = (SOCK_MGR_S *)pvArgv;
+
+    while (TRUE)
+    {
+        iRet = WSAWaitForMultipleEvents(pstSockMgr->ulSockNums,
+            pstSockMgr->stNetEvent.arrWSAEvts,
+            FALSE, INFINITE, FALSE);
+        if ( iRet == WSA_WAIT_FAILED || iRet == WSA_WAIT_TIMEOUT)
+        {
+            iError = GetLastError();
+            if ( iError != ERROR_INVALID_PARAMETER )
+            {
+                CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "WSAEvent continue, iRet=%d errorcode=(%d)\n", iRet, iError);
+            }
+            continue;
+        }
+
+        iEvtIndex = iRet - WSA_WAIT_EVENT_0;
+        sSocket   = pstSockMgr->stNetEvent.arrSocketEvts[iEvtIndex];
+
+        WSAEnumNetworkEvents(sSocket, pstSockMgr->stNetEvent.arrWSAEvts[iEvtIndex], &NetworkEvents);
+
+        if (NetworkEvents.lNetworkEvents & FD_READ)
+        {
+            /*消息处理*/
+            if (sSocket == pstSockMgr->sUdpMsgSock )
+            {
+                iRet = recvfrom(sSocket, acRecvBuf, MSG_RECVBUF, 0, (struct sockaddr*)&stClientInfo, &iLen);
+                if (iRet > 0 )
+                {
+                    if (SYS_ERR == OpensslProxy_MessageCtrlMain(acRecvBuf, iRet))
+                    {
+                        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "MessageCtrlMain handler error, iRet=%d errorcode=(%d)\n", iRet, GetLastError() );
+                    }
+                }
+                else
+                {
+                    CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "MessageCtrlMain udp recvfrom error, iRet=%d errorcode=(%d)\n", iRet, GetLastError());
+                }
+            }
+            else
+            {
+                iRet = recv(sSocket, acRecvBuf, MSG_RECVBUF, 0);
+                if (iRet == 0 || (iRet == SOCKET_ERROR && WSAGetLastError() == WSAECONNRESET))
+                {
+                    CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "WSAEnumNetworkEvents error, iRet=%d errorcode=(%d)\n", iRet, iError);
+                    (VOID)OpensslProxy_SockEventDel(pstSockMgr, iEvtIndex);
+                }
+                else
+                {
+                    printf("[LOCAL!] LocalReadWorker! Read the Content=%s,\n", acRecvBuf);
+                }
+            }
+        }
+
+        if (NetworkEvents.lNetworkEvents & FD_CLOSE)
+        {
+            
+        }
+
+    }
 
     return 0;
 }
@@ -40,6 +116,9 @@ VOID   OpensslProxy_NetworkEventReset(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex)
 
 INT32 OpensslProxy_SockEventCtrl(SOCK_MGR_S *pstSockMgr, UINT32 uiIndex, UINT32 uiCtrlCode)
 {
+    /*TODO: 这块其实应该是需要获取原先的，然后取消或者添加相关位*/
+    ULONG   ulEventMask = 0;
+
     if ( NULL == pstSockMgr)
     {
         return SYS_ERR;
@@ -51,17 +130,23 @@ INT32 OpensslProxy_SockEventCtrl(SOCK_MGR_S *pstSockMgr, UINT32 uiIndex, UINT32 
                 (VOID)OpensslProxy_SockEventDel(pstSockMgr, uiIndex);
             break;
         case SOCKCTRL_CLOSE_RECV:
+            ulEventMask = FD_CLOSE;
             break;
         case SOCKCTRL_OPEN_RECV:
+            ulEventMask = FD_READ | FD_CLOSE;
             break;
         case SOCKCTRL_CLOSE_SEND:
+            ulEventMask =  FD_CLOSE;
             break;
         case SOCKCTRL_OPEN_SEND:
+            ulEventMask = FD_WRITE | FD_CLOSE;
             break;
         case SOCKCTRL_UNKNOW:
         default:
             break;
     }
+
+    WSAEventSelect(pstSockMgr->stArrySockInfo[uiIndex].sSockfd, pstSockMgr->stArrySockInfo[uiIndex].hEvtHandle, ulEventMask);
 
     return SYS_OK;
 }
