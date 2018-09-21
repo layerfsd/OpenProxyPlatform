@@ -101,7 +101,7 @@ ErrorHandle:
 
 		if (NULL != g_pstMgrCtx->pstWorkerCtx)
 		{
-			OpensslProxy_NetworkEventWorkerRelease(g_pstMgrCtx->pstWorkerCtx);
+			OpensslProxy_NetworkEventWorkerRelease();
 			g_pstMgrCtx->pstWorkerCtx = NULL;
 		}
 
@@ -126,7 +126,7 @@ VOID OpenSSLProxy_MgrUnInit()
 
         if (NULL != g_pstMgrCtx->pstWorkerCtx)
         {
-            OpensslProxy_NetworkEventWorkerRelease(g_pstMgrCtx->pstWorkerCtx);
+            OpensslProxy_NetworkEventWorkerRelease();
             g_pstMgrCtx->pstWorkerCtx = NULL;
         }
 

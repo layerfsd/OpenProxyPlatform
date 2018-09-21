@@ -122,9 +122,10 @@ unsigned int __stdcall OpensslProxy_LocalAccept(PVOID pvArg)
             
             if ( SYS_ERR == OpensslProxy_DispatchNetworkByBlanceAlgm(stNewClientInfo.sLocalFD, pstPackDispatch->ulBlanceAlgm) )
             {
+                CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "DispatchNetworkByBlanceAlgm error, BlanceAlgm=%d!", pstPackDispatch->ulBlanceAlgm);
+                closesocket(stNewClientInfo.sLocalFD);
                 continue;
             }
-
         }
         else
         {

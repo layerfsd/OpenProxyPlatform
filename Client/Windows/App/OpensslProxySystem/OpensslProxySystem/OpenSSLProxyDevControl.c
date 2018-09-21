@@ -43,7 +43,8 @@ NTSTATUS DeviceIoControl(
 	{
 		case DEVICE_IOCTL_MATCHENABLE:
 				gConnectionRedirectEnable = TRUE;
-				KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device ioctl match Enable!\n"));
+                KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device ioctl match Enable!\n"));
+                //KeBugCheck(0);
 			break;
 		case DEVICE_IOCTL_MATCHDISABLE:
 				gConnectionRedirectEnable = FALSE;

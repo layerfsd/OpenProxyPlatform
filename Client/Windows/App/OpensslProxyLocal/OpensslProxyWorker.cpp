@@ -16,7 +16,8 @@
 #include "OpensslProxyMsgCtrl.h"
 
 /******************************************PerSocket的信息********************************************************/
-
+/*为了接收其它线程消息，方便访问，修改为全局变量*/
+WORKER_CTX_S *g_pstWorker = NULL;
 INT32       OpensslProxy_SockEventDel(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex);
 
 
@@ -25,6 +26,16 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
 
 
     return 0;
+}
+
+VOID   OpensslProxy_NetworkEventReset(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex)
+{
+    if (uiEvtIndex >= WSAEVT_NUMS)
+    {
+        return;
+    }
+    pstSockMgr->stNetEvent.arrWSAEvts[uiEvtIndex] = NULL;
+    pstSockMgr->stNetEvent.arrSocketEvts[uiEvtIndex] = INVALID_SOCKET;
 }
 
 INT32 OpensslProxy_SockEventCtrl(SOCK_MGR_S *pstSockMgr, UINT32 uiIndex, UINT32 uiCtrlCode)
@@ -70,16 +81,6 @@ VOID   OpensslProxy_PerSockInfoReset(PERSOCKINFO_S *pstPerSockInfo)
     pstPerSockInfo->lEvtsIndex = -1; 
     pstPerSockInfo->lPeerEvtsIndex = -1;
     pstPerSockInfo->pfSockCtrlCb = OpensslProxy_SockEventCtrl;
-}
-
-VOID   OpensslProxy_NetworkEventReset(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex)
-{
-    if (uiEvtIndex >= WSAEVT_NUMS )
-    {
-        return;
-    }
-    pstSockMgr->stNetEvent.arrWSAEvts[uiEvtIndex] = NULL;
-    pstSockMgr->stNetEvent.arrSocketEvts[uiEvtIndex] = INVALID_SOCKET;
 }
 
 /*获取对端的事件索引*/
@@ -193,13 +194,81 @@ INT32       OpensslProxy_SockEventDel(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex)
     return SYS_OK;
 }
 
+/*获取通信端口*/
+USHORT  OpensslProxy_GetMsgSocketPortByIndex(UINT32   uiArryIndex)
+{
+    USHORT  usPort = 0;
+
+    if (NULL == g_pstWorker
+        || uiArryIndex >= MGR_ARRYNUMS )
+    {
+        return 0;
+    }
+
+    /*多线程锁*/
+    EnterCriticalSection(&g_pstWorker->stWorkerLock);
+    if (NULL != g_pstWorker->pstArryWorker[uiArryIndex] )
+    {
+        usPort = g_pstWorker->pstArryWorker[uiArryIndex]->usUdpMsgPort;
+    }
+    LeaveCriticalSection(&g_pstWorker->stWorkerLock);
+    
+    return usPort;
+}
+
+
+/*获取通信端口*/
+USHORT  OpensslProxy_GenMsgSocketPort()
+{
+    USHORT  usPort = 0;
+
+    if (NULL == g_pstWorker )
+    {
+        return 0;
+    }
+
+    /*直接还是线程锁吧*/
+    EnterCriticalSection(&g_pstWorker->stWorkerLock);
+    InterlockedIncrement(&g_pstWorker->usMsgPortNum);
+    usPort = g_pstWorker->usMsgPortNum;
+    LeaveCriticalSection(&g_pstWorker->stWorkerLock);
+
+    return usPort;
+}
+
+/*直接往相关的索引线程发送消息*/
+INT32 OpensslProxy_SockMgr_MainWorkerSendto(CHAR *pcSndBuf, UINT32 uiSendLen,  UINT32 uiArryIndex)
+{
+    USHORT          usPort = 0;
+    INT32              iRet = 0;
+    SOCKET          sSocket = INVALID_SOCKET;
+
+    usPort = OpensslProxy_GetMsgSocketPortByIndex(uiArryIndex);
+    if (0 == usPort)
+    {
+        return SYS_ERR;
+    }
+
+    /*创建UDP通信端口*/
+    sSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (INVALID_SOCKET == sSocket)
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Director message udp socket error=%d", GetLastError());
+        return SYS_ERR;
+    }
+
+    //iRet = sendto(sSocket, pcSndBuf, uiSendLen,0, );
+
+    return SYS_OK;
+}
 
 SOCK_MGR_S *OpensslProxy_SockMgrCreate(WORKER_CTX_S *pstWorker, UINT32   uiArryIndex)
 {
-    SOCK_MGR_S      *pstSockMgr  = NULL;
-    DWORD				 dwStatckSize = MGR_STACKSIZE;
-    ULONG                 ulBlock = 1;
-    INT32                   iRet = 0;
+    SOCK_MGR_S*          pstSockMgr  = NULL;
+    SOCKADDR_IN         stSerAddr = { 0 };
+    DWORD				     dwStatckSize = MGR_STACKSIZE;
+    ULONG                    ulBlock = 1;
+    INT32                       iRet = 0;
 
     pstSockMgr = (SOCK_MGR_S *)malloc(sizeof(SOCK_MGR_S));
     if (NULL == pstSockMgr)
@@ -232,6 +301,23 @@ SOCK_MGR_S *OpensslProxy_SockMgrCreate(WORKER_CTX_S *pstWorker, UINT32   uiArryI
     if (INVALID_SOCKET == pstSockMgr->sUdpMsgSock)
     {
         CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "msg udp socket create error=%d", GetLastError());
+        CloseHandle(pstSockMgr->hCompleteEvent);
+        free(pstSockMgr);
+        pstSockMgr = NULL;
+        return NULL;
+    }
+
+    pstSockMgr->usUdpMsgPort = OpensslProxy_GenMsgSocketPort();
+
+    stSerAddr.sin_family = AF_INET;
+    stSerAddr.sin_port = htons(pstSockMgr->usUdpMsgPort);
+    inet_pton(AF_INET, MGR_LOCALADDRA, &stSerAddr.sin_addr);
+
+    //stSerAddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+    if (bind(pstSockMgr->sUdpMsgSock, (sockaddr *)&stSerAddr, sizeof(stSerAddr)) == SOCKET_ERROR)
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "msg udp socket bind error=%d", GetLastError());
+        closesocket(pstSockMgr->sUdpMsgSock); 
         CloseHandle(pstSockMgr->hCompleteEvent);
         free(pstSockMgr);
         pstSockMgr = NULL;
@@ -280,6 +366,8 @@ SOCK_MGR_S *OpensslProxy_SockMgrCreate(WORKER_CTX_S *pstWorker, UINT32   uiArryI
         return NULL;
     }
 
+    /*整个线程也需要计数*/
+    InterlockedIncrement(&pstWorker->uiWorkerNums);
 
     return pstSockMgr;
 }
@@ -293,13 +381,43 @@ VOID OpensslProxy_SockMgrRelease(SOCK_MGR_S *pstSockMgr)
 }
 
 /**********************************************Worker总的上下文的管理器************************************************************/
+/*全局访问，可以直接访问到通信socket*/
 /*根据算法派发相关的ClientSocket*/
 INT32 OpensslProxy_DispatchNetworkByBlanceAlgm(SOCKET sNewClientFd, UINT32 uiBlanceAlgm)
 {
+    UINT32                              uiIndex = 0;
+    INT32                                 iRet = 0;
+    MCTRL_CLIENTINFO_S      stClientCtrlInfo = {0};
+    CHAR                                 acMessageBuf[MCTL_BUFSIZE] = {0};
 
+    /*TODO: 根据算法，获取具体要分发的Worker线程索引*/
+    switch (uiBlanceAlgm)
+    {
+        case 0:
+            /*默认就是第0个*/
+            uiIndex = 0;
+            break;
+        default:
+            break;
+    }
 
+    stClientCtrlInfo.uiCtrlCode = CLNTNFO_CTRLCODE_SOCKADD;
+    stClientCtrlInfo.sClientSockfd = sNewClientFd;
 
-    return SYS_ERR;
+    /*获取到具体的索引，然后开始客户端信息分发*/
+    iRet = OpensslProxy_MessageCtrl_ClientInfo(acMessageBuf, &stClientCtrlInfo);
+    if ( SYS_ERR == iRet )
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "msg ctrl make pack Info:  [ client info ] error!");
+        return SYS_ERR;
+    }
+    else
+    {
+        /*发送给对方*/
+
+    }
+
+    return SYS_OK;
 }
 
 
@@ -341,66 +459,82 @@ unsigned int __stdcall OpensslProxy_WorkerMsgCtrl(PVOID pvArg)
 
 WORKER_CTX_S *OpensslProxy_NetworkEventWorkerCreate()
 {
-	WORKER_CTX_S *pstWorker = NULL;
-    UINT32                uiIndex = 0;
+    UINT32                  uiIndex       = 0;
+    USHORT                usPort         = 0;
+    SOCKADDR_IN      stSerAddr   = {0};
 
-	pstWorker = (WORKER_CTX_S *)malloc(sizeof(WORKER_CTX_S));
-	if (NULL == pstWorker)
+    g_pstWorker = (WORKER_CTX_S *)malloc(sizeof(WORKER_CTX_S));
+	if (NULL == g_pstWorker)
 	{
 		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "malloc worker context error!");
 		return NULL;
 	}
 
-	RtlZeroMemory(pstWorker, sizeof(WORKER_CTX_S));
-    InitializeCriticalSection(&pstWorker->stWorkerLock);
+	RtlZeroMemory(g_pstWorker, sizeof(WORKER_CTX_S));
+    InitializeCriticalSection(&g_pstWorker->stWorkerLock);
 
     for (int i = 0; i < MGR_ARRYNUMS; i++)
     {
-        pstWorker->pstArryWorker[i] = NULL;
+        g_pstWorker->pstArryWorker[i] = NULL;
     }
 
-    pstWorker->uiWorkerNums = MSG_UDPPORT_START;
+    g_pstWorker->uiWorkerNums = MSG_UDPPORT_START;
 
 
     /*创建UDP通信端口*/
-    pstWorker->sMsgCtrlSockFd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (INVALID_SOCKET == pstWorker->sMsgCtrlSockFd)
+    g_pstWorker->sMsgCtrlSockFd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (INVALID_SOCKET == g_pstWorker->sMsgCtrlSockFd)
     {
         CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "msg udp socket create error=%d", GetLastError());
-        DeleteCriticalSection(&pstWorker->stWorkerLock);
-        free(pstWorker);
+        DeleteCriticalSection(&g_pstWorker->stWorkerLock);
+        free(g_pstWorker);
+        return NULL;
+    }
+
+    usPort = OpensslProxy_GenMsgSocketPort();
+    stSerAddr.sin_family = AF_INET;
+    stSerAddr.sin_port = htons(usPort);
+    inet_pton(AF_INET, MGR_LOCALADDRA, &stSerAddr.sin_addr);
+    //stSerAddr.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+    if ( bind(g_pstWorker->sMsgCtrlSockFd, (sockaddr *)&stSerAddr, sizeof(stSerAddr)) == SOCKET_ERROR )
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "msg udp socket bind error=%d", GetLastError());
+        closesocket(g_pstWorker->sMsgCtrlSockFd);
+        DeleteCriticalSection(&g_pstWorker->stWorkerLock);
+        free(g_pstWorker);
         return NULL;
     }
 
     /*直接创建消息线程, 简单的消息控制，不可靠，需要添加可靠队列*/
-    _beginthreadex(NULL, 0, OpensslProxy_WorkerMsgCtrl, pstWorker, 0, NULL);
+    _beginthreadex(NULL, 0, OpensslProxy_WorkerMsgCtrl, g_pstWorker, 0, NULL);
 
     /*默认先创建一个*/
-    pstWorker->pstArryWorker[uiIndex] = OpensslProxy_SockMgrCreate(pstWorker, uiIndex);
-    if (NULL == pstWorker->pstArryWorker[uiIndex] )
+    g_pstWorker->pstArryWorker[uiIndex] = OpensslProxy_SockMgrCreate(g_pstWorker, uiIndex);
+    if (NULL == g_pstWorker->pstArryWorker[uiIndex] )
     {
         CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "create socket manager error!");
-        closesocket(pstWorker->sMsgCtrlSockFd);
-        DeleteCriticalSection(&pstWorker->stWorkerLock);
-        free(pstWorker);
+        closesocket(g_pstWorker->sMsgCtrlSockFd);
+        DeleteCriticalSection(&g_pstWorker->stWorkerLock);
+        free(g_pstWorker);
         return NULL;
     }
 
-	return pstWorker;
+	return g_pstWorker;
 }
 
 
-VOID OpensslProxy_NetworkEventWorkerRelease(PWORKER_CTX_S pstWorker)
+VOID OpensslProxy_NetworkEventWorkerRelease()
 {
-	if (NULL != pstWorker)
+	if (NULL != g_pstWorker)
 	{
         for (int i = 0; i < MGR_ARRYNUMS; i++)
         {
-            OpensslProxy_SockMgrRelease(pstWorker->pstArryWorker[i]);
+            OpensslProxy_SockMgrRelease(g_pstWorker->pstArryWorker[i]);
         }
 
-        DeleteCriticalSection(&pstWorker->stWorkerLock);
-		free(pstWorker);
+        DeleteCriticalSection(&g_pstWorker->stWorkerLock);
+		free(g_pstWorker);
+        g_pstWorker = NULL;
 	}
 }
 
