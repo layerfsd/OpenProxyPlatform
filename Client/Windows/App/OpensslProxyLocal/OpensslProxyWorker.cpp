@@ -41,17 +41,19 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
 
     pstSockMgr = (SOCK_MGR_S *)pvArgv;
 
+
+    SetEvent(pstSockMgr->hCompleteEvent);
+
     while (TRUE)
     {
-        iRet = WSAWaitForMultipleEvents(pstSockMgr->ulSockNums,
-            pstSockMgr->stNetEvent.arrWSAEvts,
-            FALSE, INFINITE, FALSE);
+        iRet = WSAWaitForMultipleEvents(pstSockMgr->ulSockNums, pstSockMgr->stNetEvent.arrWSAEvts, FALSE, INFINITE, FALSE);
         if ( iRet == WSA_WAIT_FAILED || iRet == WSA_WAIT_TIMEOUT)
         {
             iError = GetLastError();
             if ( iError != ERROR_INVALID_PARAMETER )
             {
-                CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "WSAEvent continue, iRet=%d errorcode=(%d)\n", iRet, iError);
+                CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "WSAEvent continue, iRet=%d errorcode=(%d), sockNums=%d\n",
+                    iRet, iError, pstSockMgr->ulSockNums);
             }
             continue;
         }
@@ -72,6 +74,10 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
                     if (SYS_ERR == OpensslProxy_MessageCtrlMain(acRecvBuf, iRet))
                     {
                         CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "MessageCtrlMain handler error, iRet=%d errorcode=(%d)\n", iRet, GetLastError() );
+                    }
+                    else
+                    {
+                        printf("recvfrom the udp message socket data len=%d\n", iRet);
                     }
                 }
                 else
@@ -327,6 +333,8 @@ INT32 OpensslProxy_SockMgr_MainWorkerSendto(CHAR *pcSndBuf, UINT32 uiSendLen,  U
     USHORT          usPort = 0;
     INT32              iRet = 0;
     SOCKET          sSocket = INVALID_SOCKET;
+    sockaddr_in    remoteAddr = {0};
+    int                   nAddrLen = sizeof(remoteAddr);
 
     usPort = OpensslProxy_GetMsgSocketPortByIndex(uiArryIndex);
     if (0 == usPort)
@@ -342,7 +350,16 @@ INT32 OpensslProxy_SockMgr_MainWorkerSendto(CHAR *pcSndBuf, UINT32 uiSendLen,  U
         return SYS_ERR;
     }
 
-    //iRet = sendto(sSocket, pcSndBuf, uiSendLen,0, );
+    remoteAddr.sin_family = AF_INET;
+    remoteAddr.sin_port = htons(usPort);
+    inet_pton(AF_INET, MGR_LOCALADDRA, &remoteAddr.sin_addr);
+
+    iRet = sendto(sSocket, pcSndBuf, uiSendLen,0, (sockaddr *)&remoteAddr, nAddrLen);
+    if (iRet <= 0 )
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Director message udp socket sendto error=%d", GetLastError());
+        return SYS_ERR;
+    }
 
     return SYS_OK;
 }
@@ -430,10 +447,6 @@ SOCK_MGR_S *OpensslProxy_SockMgrCreate(WORKER_CTX_S *pstWorker, UINT32   uiArryI
         pstSockMgr = NULL;
         return NULL;
     }
-    else
-    {
-        InterlockedIncrement(&pstSockMgr->ulSockNums);
-    }
 
     /*直接在当前线程先创建Accept的本地服务端*/
     pstSockMgr->hThreadHandle = _beginthreadex(NULL, dwStatckSize, OpensslProxy_NetworkEventsWorker, pstSockMgr, 0, NULL);
@@ -470,7 +483,7 @@ VOID OpensslProxy_SockMgrRelease(SOCK_MGR_S *pstSockMgr)
 /*根据算法派发相关的ClientSocket*/
 INT32 OpensslProxy_DispatchNetworkByBlanceAlgm(SOCKET sNewClientFd, UINT32 uiBlanceAlgm)
 {
-    UINT32                              uiIndex = 0;
+    UINT32                              uiArryIndex = 0;
     INT32                                 iRet = 0;
     MCTRL_CLIENTINFO_S      stClientCtrlInfo = {0};
     CHAR                                 acMessageBuf[MCTL_BUFSIZE] = {0};
@@ -480,7 +493,7 @@ INT32 OpensslProxy_DispatchNetworkByBlanceAlgm(SOCKET sNewClientFd, UINT32 uiBla
     {
         case 0:
             /*默认就是第0个*/
-            uiIndex = 0;
+            uiArryIndex = 0;
             break;
         default:
             break;
@@ -499,7 +512,11 @@ INT32 OpensslProxy_DispatchNetworkByBlanceAlgm(SOCKET sNewClientFd, UINT32 uiBla
     else
     {
         /*发送给对方*/
-
+        if (SYS_ERR == OpensslProxy_SockMgr_MainWorkerSendto(acMessageBuf, MCTL_BUFSIZE, uiArryIndex))
+        {
+            CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "msg ctrl send pack error!");
+            return SYS_ERR;
+        }
     }
 
     return SYS_OK;
@@ -594,6 +611,7 @@ WORKER_CTX_S *OpensslProxy_NetworkEventWorkerCreate()
     _beginthreadex(NULL, 0, OpensslProxy_WorkerMsgCtrl, g_pstWorker, 0, NULL);
 
     /*默认先创建一个*/
+    uiIndex = 0;
     g_pstWorker->pstArryWorker[uiIndex] = OpensslProxy_SockMgrCreate(g_pstWorker, uiIndex);
     if (NULL == g_pstWorker->pstArryWorker[uiIndex] )
     {

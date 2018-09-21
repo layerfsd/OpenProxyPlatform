@@ -118,13 +118,16 @@ unsigned int __stdcall OpensslProxy_LocalAccept(PVOID pvArg)
         {
             inet_ntop(AF_INET, &stNewClientInfo.stLocalInfo.sin_addr, acAddr, MGR_IPV4LEN);
             usClientPort = ntohs(stNewClientInfo.stLocalInfo.sin_port);
-            CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "Accept a new Local client info=%s:%d!", acAddr, usClientPort);
             
             if ( SYS_ERR == OpensslProxy_DispatchNetworkByBlanceAlgm(stNewClientInfo.sLocalFD, pstPackDispatch->ulBlanceAlgm) )
             {
                 CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "DispatchNetworkByBlanceAlgm error, BlanceAlgm=%d!", pstPackDispatch->ulBlanceAlgm);
                 closesocket(stNewClientInfo.sLocalFD);
                 continue;
+            }
+            else
+            {
+                CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "Accept a new Local client info=%s:%d!", acAddr, usClientPort);
             }
         }
         else

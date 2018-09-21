@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
         goto Exit;
     }
 
-    if  (SYS_ERR == OpenSSLProxy_DrvCtrl_SetLocalPortRange(60000, 65000))
+    if  (SYS_ERR == OpenSSLProxy_DrvCtrl_SetLocalPortRange(DRV_MGRLOCALPORT_START, DRV_MGRLOCALPORT_END))
     {
         CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Set ip-addr and Port error!");
         goto Exit;

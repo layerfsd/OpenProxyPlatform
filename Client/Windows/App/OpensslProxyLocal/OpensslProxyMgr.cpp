@@ -72,20 +72,21 @@ INT32 OpenSSLProxy_MgrInit()
 		goto ErrorHandle;
 	}
 
-    g_pstMgrCtx->pstWorkerCtx = OpensslProxy_NetworkEventWorkerCreate();
-    if (NULL == g_pstMgrCtx->pstWorkerCtx)
+    g_pstMgrCtx->pstClientDispatchCtx = OpensslProxy_DispatchPackCtxCreate();
+    if (NULL == g_pstMgrCtx->pstClientDispatchCtx)
     {
-        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Driver create the Network context error=%08x!", GetLastError());
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Create the dispatch context error=%08x!", GetLastError());
         goto ErrorHandle;
     }
 
-	g_pstMgrCtx->pstClientDispatchCtx = OpensslProxy_DispatchPackCtxCreate();
-	if (NULL == g_pstMgrCtx->pstClientDispatchCtx )
-	{
-		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Driver create the dispatch context error=%08x!", GetLastError());
-		goto ErrorHandle;
-	}
+    g_pstMgrCtx->pstWorkerCtx = OpensslProxy_NetworkEventWorkerCreate();
+    if (NULL == g_pstMgrCtx->pstWorkerCtx)
+    {
+        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Create the Network context error=%08x!", GetLastError());
+        goto ErrorHandle;
+    }
 
+    CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT,  "OpensslProxy manager context init successful!\n");
 
 	return SYS_OK;
 

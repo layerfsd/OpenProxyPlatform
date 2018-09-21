@@ -9,6 +9,8 @@ typedef struct tagMgrContext
 	USHORT								usListenPort;				/*µ±Ç°¶Ë¿Ú*/
 }MGR_CTX_S, *PMGR_CTX_S;
 
+#define DRV_MGRLOCALPORT_START           60000
+#define DRV_MGRLOCALPORT_END               65000
 
 INT32	OpenSSLProxy_MgrInit();
 

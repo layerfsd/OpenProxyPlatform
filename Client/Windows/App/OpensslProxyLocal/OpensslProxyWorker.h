@@ -16,7 +16,7 @@ VOID        OpensslProxy_NetworkEventWorkerRelease();
 
 INT32       OpensslProxy_DispatchNetworkByBlanceAlgm(SOCKET sNewClientFd, UINT32 uiBlanceAlgm);
 
-SOCKET    OpensslProxy_GetMsgSocketByIndex(UINT32   uiArryIndex);
+INT32       OpensslProxy_SockMgr_MainWorkerSendto(CHAR *pcSndBuf, UINT32 uiSendLen, UINT32 uiArryIndex);
 
 
 
