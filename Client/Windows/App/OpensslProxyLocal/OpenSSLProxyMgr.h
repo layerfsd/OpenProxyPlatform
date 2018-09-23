@@ -3,7 +3,7 @@
 /*上下文管理器*/
 typedef struct tagMgrContext
 {
-	PWORKER_CTX_S				pstWorkerCtx;				/*工作线程管理上下文*/
+	PWORKER_CTX_S					pstWorkerCtx;				/*工作线程管理上下文*/
 	PDISPATCHPACK_CTX_S		pstClientDispatchCtx;	/*客户端新建派发线程*/
 	ULONG								ulProcessID;					/*当前进程ID*/
 	USHORT								usListenPort;				/*当前端口*/

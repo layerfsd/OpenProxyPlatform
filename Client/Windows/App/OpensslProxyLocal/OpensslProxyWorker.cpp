@@ -10,16 +10,16 @@
 #include "../common/Sem.h"
 #include "../common/Queue.h"
 #include "../common/CommIoBuf.h"
+#include "OpensslProxyTlsHandler.h"
 #include "OpensslProxyWorker.h"
 #include "OpensslProxyPacketDispatch.h"
 #include "OpenSSLProxyMgr.h"
 #include "OpensslProxyMsgCtrl.h"
 
+
 /******************************************PerSocket的信息********************************************************/
 /*为了接收其它线程消息，方便访问，修改为全局变量*/
 WORKER_CTX_S *g_pstWorker = NULL;
-INT32       OpensslProxy_SockEventDel(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex);
-
 
 unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
 {
@@ -29,10 +29,13 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
     INT32                       iError = 0;
     SOCKET                    sSocket = INVALID_SOCKET;
     SOCK_MGR_S*         pstSockMgr = NULL;
+	PPERSOCKINFO_S	pstPerSockInfo = NULL;
     CHAR                       acRecvBuf[MSG_RECVBUF] = {0};
     struct  sockaddr_in  stClientInfo = { 0 };
-    INT32                       iLen = sizeof(stClientInfo);
     WSANETWORKEVENTS NetworkEvents = { 0 };
+	SSL_CTX*					pstTlsCtxClient = NULL;
+	SSL_CTX*					pstTlsCtxServer = NULL;
+	INT32                       iLen = sizeof(stClientInfo);
 
     if (NULL == pvArgv)
     {
@@ -41,6 +44,21 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
 
     pstSockMgr = (SOCK_MGR_S *)pvArgv;
 
+	pstTlsCtxClient = SSL_CTX_new(SSLv23_client_method());
+	if (NULL == pstTlsCtxClient)
+	{
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "SSL Ctx client create error!\n");
+		return -1;
+	}
+
+	pstTlsCtxServer = SSLPROXY_TLSCtxNewServer();
+	if (NULL == pstTlsCtxServer)
+	{
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "SSL Ctx client create error!\n");
+		SSL_CTX_free(pstTlsCtxClient);
+		pstTlsCtxClient = NULL;
+		return -1;
+	}
 
     SetEvent(pstSockMgr->hCompleteEvent);
 
@@ -71,13 +89,9 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
                 iRet = recvfrom(sSocket, acRecvBuf, MSG_RECVBUF, 0, (struct sockaddr*)&stClientInfo, &iLen);
                 if (iRet > 0 )
                 {
-                    if (SYS_ERR == OpensslProxy_MessageCtrlMain(acRecvBuf, iRet))
+                    if (SYS_ERR == OpensslProxy_MessageCtrlMain(pstSockMgr, acRecvBuf, iRet))
                     {
                         CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "MessageCtrlMain handler error, iRet=%d errorcode=(%d)\n", iRet, GetLastError() );
-                    }
-                    else
-                    {
-                        printf("recvfrom the udp message socket data len=%d\n", iRet);
                     }
                 }
                 else
@@ -87,16 +101,57 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
             }
             else
             {
-                iRet = recv(sSocket, acRecvBuf, MSG_RECVBUF, 0);
-                if (iRet == 0 || (iRet == SOCKET_ERROR && WSAGetLastError() == WSAECONNRESET))
-                {
-                    CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "WSAEnumNetworkEvents error, iRet=%d errorcode=(%d)\n", iRet, iError);
-                    (VOID)OpensslProxy_SockEventDel(pstSockMgr, iEvtIndex);
-                }
-                else
-                {
-                    printf("[LOCAL!] LocalReadWorker! Read the Content=%s,\n", acRecvBuf);
-                }
+				pstPerSockInfo = &pstSockMgr->stArrySockInfo[iEvtIndex];
+
+				/*加入后，先启动本地的Socket*/
+				if ( pstPerSockInfo->eSockType == SOCKTYPE_LOCAL )
+				{
+					/*如果是本地的刚刚开始接收服务，需要先判断本地是否为TLS*/
+					if ( TLSVERSION_INIT == pstPerSockInfo->stTlsInfo.uiTlsVersion )
+					{
+						pstPerSockInfo->stTlsInfo.uiTlsVersion = SSLPROXY_TLSVersionProtoCheck(pstPerSockInfo->sSockfd);
+						if (TLSVERSION_NOTSSL != pstPerSockInfo->stTlsInfo.uiTlsVersion)
+						{
+							pstPerSockInfo->bIsTls = TRUE;
+						}
+						else
+						{
+							pstPerSockInfo->bIsTls = FALSE;
+						}
+					}
+
+					/*加密处理流程*/
+					if (pstPerSockInfo->bIsTls)
+					{
+						/*是否已经连接成功*/
+						if (TRUE == pstPerSockInfo->stTlsInfo.IsSslConnected)
+						{
+
+						}
+					}
+					else
+					/*非加密的处理流程*/
+					{
+						iRet = recv(sSocket, acRecvBuf, MSG_RECVBUF, 0);
+						if (iRet == 0 || (iRet == SOCKET_ERROR && WSAGetLastError() == WSAECONNRESET))
+						{
+							CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "WSAEnumNetworkEvents error, iRet=%d errorcode=(%d)\n", iRet, iError);
+							(VOID)OpensslProxy_SockEventDel(pstSockMgr, iEvtIndex);
+						}
+						else
+						{
+							printf("[LOCAL!] Read the Content=%s,\n", acRecvBuf);
+						}
+					}
+				}
+				else if (pstPerSockInfo->eSockType ==  SOCKTYPE_PROXY )
+				{
+
+				}
+				else
+				{
+
+				}
             }
         }
 
@@ -224,6 +279,13 @@ INT32       OpensslProxy_SockEventAdd(SOCK_MGR_S *pstSockMgr,SOCKET sSocketFd, U
             pstSockMgr->stArrySockInfo[iIndex].lEvtsIndex = iIndex;
             pstSockMgr->stArrySockInfo[iIndex].sSockfd = sSocketFd;
             pstSockMgr->stArrySockInfo[iIndex].hEvtHandle = WSACreateEvent();
+
+			/*SSL相关*/
+			pstSockMgr->stArrySockInfo[iIndex].bIsTls = FALSE;
+			pstSockMgr->stArrySockInfo[iIndex].stTlsInfo.IsSslConnected = FALSE;
+			pstSockMgr->stArrySockInfo[iIndex].stTlsInfo.pstSsl = NULL;
+			pstSockMgr->stArrySockInfo[iIndex].stTlsInfo.uiSslType = SSLTYPE_UNKNOW;
+			pstSockMgr->stArrySockInfo[iIndex].stTlsInfo.uiTlsVersion = TLSVERSION_INIT;
 
             /*添加到对应的网络事件*/
             pstSockMgr->stNetEvent.arrSocketEvts[iIndex] = sSocketFd;
@@ -549,7 +611,7 @@ unsigned int __stdcall OpensslProxy_WorkerMsgCtrl(PVOID pvArg)
         }
         else
         {
-            if ( SYS_ERR == OpensslProxy_MessageCtrlMain(acMsg,  iRet) )
+            if ( SYS_ERR == OpensslProxy_MessageCtrlMain(pstWorker, acMsg,  iRet) )
             {
                 CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "worker msg ctrl udps message handler error!");
             }
@@ -582,6 +644,7 @@ WORKER_CTX_S *OpensslProxy_NetworkEventWorkerCreate()
 
     g_pstWorker->uiWorkerNums = MSG_UDPPORT_START;
 
+	SSLPROXY_TlsHandler_EnvInit();
 
     /*创建UDP通信端口*/
     g_pstWorker->sMsgCtrlSockFd = socket(AF_INET, SOCK_DGRAM, 0);

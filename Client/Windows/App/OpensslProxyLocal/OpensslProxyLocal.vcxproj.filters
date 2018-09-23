@@ -54,6 +54,12 @@
     <ClInclude Include="OpensslProxyMsgCtrl.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="OpensslProxyContentFliter.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="OpensslProxyTlsHandler.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -84,6 +90,15 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="OpensslProxyMsgCtrl.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="OpensslProxyContentFliter.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\ComSSLApi.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="OpensslProxyTlsHandler.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

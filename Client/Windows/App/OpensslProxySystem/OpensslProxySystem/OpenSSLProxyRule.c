@@ -33,7 +33,6 @@ PRULE_INFO_ENTRY OpenSSLProxy_RuleEntryAllocate(IN UINT32 uiRuleIP, IN USHORT us
 	PRULE_INFO_ENTRY  pRuleEntry = NULL;
 
 	pRuleEntry = (PRULE_INFO_ENTRY)ExAllocateFromNPagedLookasideList(&g_RuleInfoEntryLookasideList);
-
 	if (NULL == pRuleEntry)
 	{
 		KdPrint(("[OPENSSLDRV]: #OpenSSLProxy_RuleEntryAllocate#-->LooksideList allcate error!\n"));
@@ -259,11 +258,6 @@ BOOLEAN	OpenSSLProxy_IsPortInRange(USHORT usSrcPort)
 {
 	KIRQL						OldIrql;
 
-    KdPrint(("[OPENSSLDRV]: #OpenSSLProxy_IsPortInRange#-->SrcPort=%d,[%d -- %d]\n",
-        usSrcPort,
-        g_pstRuleMgrCtx->stSrcPortRange.uiLocalPortStart,
-        g_pstRuleMgrCtx->stSrcPortRange.uiLocalPortEnd));
-
 	OpenSSLProxy_ResourceLock(&g_pstRuleMgrCtx->stResLock, &OldIrql);
 
 	if ( usSrcPort > g_pstRuleMgrCtx->stSrcPortRange.uiLocalPortStart 
@@ -363,88 +357,21 @@ VOID OpenSSLProxy_RuleTypeClear(UINT32 uiRuleType)
 
 
 
-BOOLEAN  OpenSSLProxy_RuleListIsMatch(UINT32	 uiRuleType, PLIST_ENTRY pRulelist, IN UINT32 uiIPAddr, IN USHORT usPort)
-{
-    KIRQL						     OldIrql;
-    PRULE_INFO_ENTRY	 pRuleEntry = NULL;
-    PLIST_ENTRY				 plistEntry = NULL;
-    BOOLEAN                     bRet = FALSE;
-
-    if ( NULL == pRulelist )
-    {
-        return bRet;
-    }
-
-    OpenSSLProxy_ResourceLock(&g_pstRuleMgrCtx->stResLock, &OldIrql);
-
-    for (plistEntry = pRulelist->Flink;
-        plistEntry != pRulelist;
-        plistEntry = plistEntry->Flink)
-    {
-        pRuleEntry = CONTAINING_RECORD(plistEntry, RULE_INFO_ENTRY, listEntry);
-
-        switch (uiRuleType)
-        {
-            case OPENSSLPROXY_LISTTYPE_PORT:
-                /*端口命中即可*/
-                if (pRuleEntry->uiRulePort == usPort )
-                {
-                    bRet = TRUE;
-                }
-                break;
-            case OPENSSLPROXY_LISTTYPE_IPADDR:
-                /*地址命中即可*/
-                if (pRuleEntry->uiRuleIP == uiIPAddr)
-                {
-                    bRet = TRUE;
-                }
-                break;
-            case OPENSSLPROXY_LISTTYPE_IPPORT:
-                if ( pRuleEntry->uiRuleIP == uiIPAddr 
-                    && pRuleEntry->uiRulePort == usPort )
-                {
-                    bRet = TRUE;
-                }
-                break;
-            default:
-                KdPrint(("[OPENSSLDRV]: #OpenSSLProxy_RuleListIsMatch#-->default match type=%d\n!", uiRuleType));
-                break;
-        }
-    }
-
-    OpenSSLProxy_ResourceUnLock(&g_pstRuleMgrCtx->stResLock, OldIrql);
-
-    return bRet;
-}
-
 
 
 /*根据地址和端口进行匹配*/
 BOOLEAN OpenSSLProxy_RuleIsMatch(IN UINT32 uiIPAddr, IN USHORT usPort)
 {
-    BOOLEAN bRet = FALSE;
 
-    bRet = OpenSSLProxy_RuleListIsMatch(OPENSSLPROXY_LISTTYPE_PORT, &g_pstRuleMgrCtx->stRulePortList, uiIPAddr, usPort);
-    if (TRUE == bRet)
-    {
-        //KdPrint(("[OPENSSLDRV]: #OpenSSLProxy_RuleIsMatch#-->Match Rule IPAddr=%08x:%d\n", ntohl(uiIPAddr), ntohs(usPort)));
-        return TRUE;
-    }
+	/*1. 0.0.0.0: 80 任意地址规则*/
 
-    bRet = OpenSSLProxy_RuleListIsMatch(OPENSSLPROXY_LISTTYPE_IPADDR, &g_pstRuleMgrCtx->stRuleIPaddrList, uiIPAddr, usPort);
-    if (TRUE == bRet)
-    {
-       //KdPrint(("[OPENSSLDRV]: #OpenSSLProxy_RuleIsMatch#-->Match Rule IPAddr=%08x:%d\n", ntohl(uiIPAddr), ntohs(usPort)));
-        return TRUE;
-    }
+	/*2. 10.10.10.1: 0 某地址的任意端口规则 */
 
-    bRet = OpenSSLProxy_RuleListIsMatch(OPENSSLPROXY_LISTTYPE_IPPORT, &g_pstRuleMgrCtx->stRuleIPPortList, uiIPAddr, usPort);
-    if (TRUE == bRet)
-    {
-        //KdPrint(("[OPENSSLDRV]: #OpenSSLProxy_RuleIsMatch#-->Match Rule IPAddr=%08x:%d\n", ntohl(uiIPAddr), ntohs(usPort)));
-        return TRUE;
-    }
+	/*3. 10.10.10.1:8080 ，地址+端口完全匹配的规则*/
 
+#if  DBG
+	KdPrint(("[OPENSSLDRV]: #OpenSSLProxy_RuleIsMatch#-->Match Rule IPAddr=%08x:%d\n", uiIPAddr, usPort));
+#endif
 	return FALSE;
 }
 

@@ -19,7 +19,7 @@ typedef struct tagMessageCtrlTlv
 }MCTRL_TLV_S, *PMCTRL_TLV_S;
 
 
-INT32 OpensslProxy_MessageCtrlMain(CHAR *acBuf, UINT32 uiLen);
+INT32 OpensslProxy_MessageCtrlMain(VOID *pvCtx, CHAR *acBuf, UINT32 uiLen);
 
 
 /*关于Socket的控制*/

@@ -43,8 +43,7 @@ NTSTATUS DeviceIoControl(
 	{
 		case DEVICE_IOCTL_MATCHENABLE:
 				gConnectionRedirectEnable = TRUE;
-                KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device ioctl match Enable!\n"));
-                //KeBugCheck(0);
+				KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device ioctl match Enable!\n"));
 			break;
 		case DEVICE_IOCTL_MATCHDISABLE:
 				gConnectionRedirectEnable = FALSE;
@@ -76,13 +75,13 @@ NTSTATUS DeviceIoControl(
 					Status = OpenSSLProxy_RuleEntryAdd(pRuleInfo->uiRuleIPAddr, (USHORT)pRuleInfo->uiRulePort);
 					if (STATUS_SUCCESS != Status)
 					{
-						KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device add rule info error! [%08x:%d]!\n",
+						KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device add rule info error! [%d - %d]!\n",
 							pRuleInfo->uiRuleIPAddr, pRuleInfo->uiRulePort));
 					}
 					else
 					{
-						KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device add rule info successful! [%08x:%d]!\n",
-							ntohl(pRuleInfo->uiRuleIPAddr), ntohs(pRuleInfo->uiRulePort)));
+						KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device add rule info successful! [%d - %d]!\n",
+							pRuleInfo->uiRuleIPAddr, pRuleInfo->uiRulePort));
 					}
 				}
 			}
@@ -100,7 +99,7 @@ NTSTATUS DeviceIoControl(
 				{
 					OpenSSLProxy_RuleEntryRemove(pRuleInfo->uiRuleIPAddr, (USHORT)pRuleInfo->uiRulePort);
 					
-					KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device delete rule info successful! [%08x:%d]!\n",
+					KdPrint(("[OPENSSLDRV]: #DeviceIoControl#-->Device delete rule info successful! [%d - %d]!\n",
 						pRuleInfo->uiRuleIPAddr, pRuleInfo->uiRulePort));
 				}
 			}

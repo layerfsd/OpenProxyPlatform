@@ -9,6 +9,7 @@
 #include "../common/CommBizDefine.h"
 #include "../common/Sem.h"
 #include "../common/Queue.h"
+#include "OpensslProxyTlsHandler.h"
 #include "OpensslProxyWorker.h"
 #include "OpensslProxyPacketDispatch.h"
 #include "OpenSSLProxyMgr.h"

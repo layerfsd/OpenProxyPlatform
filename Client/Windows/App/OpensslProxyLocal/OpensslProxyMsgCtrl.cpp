@@ -10,14 +10,46 @@
 #include "../common/Sem.h"
 #include "../common/Queue.h"
 #include "OpensslProxyMsgCtrl.h"
+#include "OpensslProxyTlsHandler.h"
+#include "OpensslProxyWorker.h"
 
 
 
 
-INT32 OpensslProxy_MessageCtrlMain(CHAR *acBuf, UINT32 uiLen)
+INT32 OpensslProxy_MessageCtrlMain(VOID *pvCtx, CHAR *acBuf, UINT32 uiLen)
 {
+	PMCTRL_TLV_S               pstTlv = NULL;
 
+	if ( NULL == acBuf
+		|| uiLen != MCTL_BUFSIZE )
+	{
+		return SYS_ERR;
+	}
 
+	pstTlv = (PMCTRL_TLV_S)acBuf;
+
+	switch (pstTlv->uiMsgCode)
+	{
+		case MCTRL_MSGCODE_CLIENTINFO:
+			{
+				PMCTRL_CLIENTINFO_S pstSnd = (PMCTRL_CLIENTINFO_S)pstTlv->acMessage;
+				SOCK_MGR_S*				  pstSockMgr = (SOCK_MGR_S*)pvCtx;
+
+				/*添加本地的客户端信息*/
+				if ( SYS_ERR == OpensslProxy_SockEventAdd(pstSockMgr, pstSnd->sClientSockfd, SOCKTYPE_LOCAL) )
+				{
+					return SYS_ERR;
+				}
+				else
+				{
+
+				}
+			}
+			break;
+		default:
+
+			break;
+	}
     return SYS_OK;
 }
 

@@ -18,7 +18,6 @@
 #include "OpensslProxyPacketDispatch.h"
 #include "OpenSSLProxyMgr.h"
 
-
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "OpensslProxyDrvCtrl.lib")
 
