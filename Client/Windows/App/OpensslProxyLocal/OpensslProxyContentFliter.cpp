@@ -10,3 +10,14 @@
 #include "../common/Sem.h"
 #include "../common/Queue.h"
 #include "../common/CommIoBuf.h"
+
+
+
+/*ÄÚÈÝÔ¤´¦Àí*/
+INT32 OpensslProxy_PreContentFliterCheck( )
+{
+
+	return SYS_ERR;
+}
+
+

@@ -21,6 +21,106 @@
 /*为了接收其它线程消息，方便访问，修改为全局变量*/
 WORKER_CTX_S *g_pstWorker = NULL;
 
+
+/*将内容进行判断*/
+BOOLEAN OpensslProxy_IsPacketProxyPermit()
+{
+	return TRUE;
+}
+
+
+/*代理Socket处理*/
+INT32	OpensslProxy_NetworkEventProxyHandler(SOCK_MGR_S*         pstSockMgr, PPERSOCKINFO_S	pstProxySockInfo)
+{
+	return SYS_OK;
+}
+
+/*本地Socket处理*/
+INT32	OpensslProxy_NetworkEventLocalHandler(SOCK_MGR_S*         pstSockMgr, PPERSOCKINFO_S	pstLocalSockInfo)
+{
+	INT32                       iError = 0;
+	INT32                       iRet	  = 0;
+	CHAR                       acRecvBuf[MSG_RECVBUF] = { 0 };
+
+	/*加密的处理流程*/
+	if ( pstLocalSockInfo->bIsTls )
+	{
+		if ( NULL == pstLocalSockInfo->stTlsInfo.pstSsl )
+		{
+			pstLocalSockInfo->stTlsInfo.pstSsl = SSL_new(pstSockMgr->pstTlsCtxServer);
+			if (NULL == pstLocalSockInfo->stTlsInfo.pstSsl)
+			{
+				CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_new, ssl getError=%d", ERR_get_error());
+				ERR_print_errors_fp(stdout);
+				return SYS_ERR;
+			}
+			else
+			{
+				SSL_set_fd(pstLocalSockInfo->stTlsInfo.pstSsl, (int)pstLocalSockInfo->sSockfd);
+				iError = SSL_accept(pstLocalSockInfo->stTlsInfo.pstSsl);
+				if (iError == -1)
+				{
+					CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl getError=%d", ERR_get_error());
+					ERR_print_errors_fp(stdout);
+					return SYS_ERR;
+				}
+				else
+				{
+					pstLocalSockInfo->stTlsInfo.IsSslConnected = TRUE;
+					CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "SSL_Accept successful! sockfd=%d", pstLocalSockInfo->sSockfd);
+				}
+			}
+		}
+		else
+		{
+			if ( pstLocalSockInfo->stTlsInfo.IsSslConnected )
+			{
+				/*握手成功后，进入读取的数据阶段*/
+				iError = SSL_read(pstLocalSockInfo->stTlsInfo.pstSsl, acRecvBuf, MSG_RECVBUF);
+				if (iError > 0)
+				{
+					CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "SSL_read successful! acRecvBuf=[%d]:%s", iError, acRecvBuf);
+				}
+				else
+				{
+					CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "SSL_read error! errorCode=%d", SSL_get_error(pstLocalSockInfo->stTlsInfo.pstSsl, iError));
+					return SYS_ERR;
+				}
+			}
+			else
+			{
+				iError = SSL_accept(pstLocalSockInfo->stTlsInfo.pstSsl);
+				if (iError == -1)
+				{
+					CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl getError=%d", ERR_get_error());
+					ERR_print_errors_fp(stdout);
+					return SYS_ERR;
+				}
+				else
+				{
+					pstLocalSockInfo->stTlsInfo.IsSslConnected = TRUE;
+				}
+			}
+		}
+	}
+	/*非加密的处理流程*/
+	else
+	{
+		iRet = recv(pstLocalSockInfo->sSockfd, acRecvBuf, MSG_RECVBUF, 0);
+		if (iRet == 0 || (iRet == SOCKET_ERROR && WSAGetLastError() == WSAECONNRESET))
+		{
+			CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "WSAEnumNetworkEvents error, iRet=%d errorcode=(%d)", iRet, WSAGetLastError());
+			return SYS_ERR;
+		}
+		else
+		{
+			CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "[LOCAL!] Read the Content=%s,\n", acRecvBuf);
+		}
+	}
+
+	return SYS_OK;
+}
+
 unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
 {
     ULONG                    ulArrayIndex = 0;
@@ -47,18 +147,20 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
 	pstTlsCtxClient = SSL_CTX_new(SSLv23_client_method());
 	if (NULL == pstTlsCtxClient)
 	{
-		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "SSL Ctx client create error!\n");
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "SSL Ctx client create error!");
 		return -1;
 	}
+	pstSockMgr->pstTlsCtxClient = pstTlsCtxClient;
 
 	pstTlsCtxServer = SSLPROXY_TLSCtxNewServer();
 	if (NULL == pstTlsCtxServer)
 	{
-		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "SSL Ctx client create error!\n");
+		CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "SSL Ctx client create error!");
 		SSL_CTX_free(pstTlsCtxClient);
 		pstTlsCtxClient = NULL;
 		return -1;
 	}
+	pstSockMgr->pstTlsCtxServer = pstTlsCtxServer;
 
     SetEvent(pstSockMgr->hCompleteEvent);
 
@@ -70,7 +172,7 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
             iError = GetLastError();
             if ( iError != ERROR_INVALID_PARAMETER )
             {
-                CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "WSAEvent continue, iRet=%d errorcode=(%d), sockNums=%d\n",
+                CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "WSAEvent continue, iRet=%d errorcode=(%d), sockNums=%d",
                     iRet, iError, pstSockMgr->ulSockNums);
             }
             continue;
@@ -92,12 +194,12 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
                 {
                     if (SYS_ERR == OpensslProxy_MessageCtrlMain(pstSockMgr, acRecvBuf, iRet))
                     {
-                        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "MessageCtrlMain handler error, iRet=%d errorcode=(%d)\n", iRet, GetLastError() );
+                        CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "MessageCtrlMain handler error, iRet=%d errorcode=(%d)", iRet, GetLastError() );
                     }
                 }
                 else
                 {
-                    CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "MessageCtrlMain udp recvfrom error, iRet=%d errorcode=(%d)\n", iRet, GetLastError());
+                    CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "MessageCtrlMain udp recvfrom error, iRet=%d errorcode=(%d)", iRet, GetLastError());
                 }
 
 				/*直接继续接收*/
@@ -106,109 +208,44 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
             else
             {
 				pstPerSockInfo = &pstSockMgr->stArrySockInfo[iEvtIndex];
-				/*加入后，先启动本地的Socket*/
-				if ( pstPerSockInfo->eSockType == SOCKTYPE_LOCAL )
+
+				/*第一阶段，需要判断HTTPS还是HTTP*/
+				if ( TLSVERSION_INIT == pstPerSockInfo->stTlsInfo.uiTlsVersion )
 				{
-					/*1. 第一阶段: 本地的SSL初始化阶段*/
-					/*如果是本地的刚刚开始接收服务，需要先判断本地是否为TLS, 并尝试握手*/
-					if ( TLSVERSION_INIT == pstPerSockInfo->stTlsInfo.uiTlsVersion )
+					pstPerSockInfo->stTlsInfo.uiTlsVersion = SSLPROXY_TLSVersionProtoCheck(pstPerSockInfo->sSockfd);
+					if (TLSVERSION_NOTSSL != pstPerSockInfo->stTlsInfo.uiTlsVersion)
 					{
-						pstPerSockInfo->stTlsInfo.uiTlsVersion = SSLPROXY_TLSVersionProtoCheck(pstPerSockInfo->sSockfd);
-						if (TLSVERSION_NOTSSL != pstPerSockInfo->stTlsInfo.uiTlsVersion)
-						{
-							pstPerSockInfo->bIsTls = TRUE;
-
-							/*初次进入需要进行SSL_accept握手, 该处为本地的Socket类型，那么为服务端的SSL*/
-							pstPerSockInfo->stTlsInfo.pstSsl = SSL_new(pstTlsCtxServer);
-							if (NULL == pstPerSockInfo->stTlsInfo.pstSsl)
-							{
-								CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_new, ssl getError=%d", ERR_get_error());
-								ERR_print_errors_fp(stdout);
-								continue;
-							}
-
-							SSL_set_fd(pstPerSockInfo->stTlsInfo.pstSsl, (int)pstPerSockInfo->sSockfd);
-							iError = SSL_accept(pstPerSockInfo->stTlsInfo.pstSsl);
-							if (iError == -1)
-							{
-								CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl getError=%d", ERR_get_error());
-								ERR_print_errors_fp(stdout);
-								continue;
-							}
-							else
-							{
-								CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "SSL_Accept successful! sockfd=%d", pstPerSockInfo->sSockfd);
-								pstPerSockInfo->stTlsInfo.IsSslConnected = TRUE;
-							}
-						}
-						else
-						{
-							pstPerSockInfo->bIsTls = FALSE;
-						}
+						pstPerSockInfo->bIsTls = TRUE;
 					}
-
-					/*2. 第一阶段: 本地的SSL握手阶段*/
-					/*加密处理流程*/
-					if (pstPerSockInfo->bIsTls)
-					{
-						/*是否已经握手成功*/
-						if ( FALSE == pstPerSockInfo->stTlsInfo.IsSslConnected)
+				}
+				switch ( pstPerSockInfo->eSockType )
+				{
+					case SOCKTYPE_LOCAL:
+						if ( SYS_ERR== OpensslProxy_NetworkEventLocalHandler(pstSockMgr, pstPerSockInfo) )
 						{
-							iError = SSL_accept(pstPerSockInfo->stTlsInfo.pstSsl);
-							if (iError == -1)
-							{
-								CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl getError=%d", ERR_get_error());
-								ERR_print_errors_fp(stdout);
-								continue;
-							}
-							else
-							{
-								pstPerSockInfo->stTlsInfo.IsSslConnected = TRUE;
-							}
-						}
-						else
-						{
-							
-							/*握手成功后，进入读取的数据阶段*/
-							iError = SSL_read(pstPerSockInfo->stTlsInfo.pstSsl, acRecvBuf, MSG_RECVBUF);
-							if (iError > 0 )
-							{
-								CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "SSL_read successful! acRecvBuf=[%d]%s", iError, acRecvBuf);
-							}
-						
-						}
-					}
-					else
-					/*非加密的处理流程, 直接读取相关数据即可*/
-					{
-						iRet = recv(sSocket, acRecvBuf, MSG_RECVBUF, 0);
-						if (iRet == 0 || (iRet == SOCKET_ERROR && WSAGetLastError() == WSAECONNRESET))
-						{
-							CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "WSAEnumNetworkEvents error, iRet=%d errorcode=(%d)\n", iRet, iError);
 							(VOID)OpensslProxy_SockEventDel(pstSockMgr, iEvtIndex);
+							CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Network Event Local handler error");
 						}
-						else
+						break;
+					case SOCKTYPE_PROXY:
+						if (SYS_ERR == OpensslProxy_NetworkEventProxyHandler(pstSockMgr, pstPerSockInfo))
 						{
-							printf("[LOCAL!] Read the Content=%s,\n", acRecvBuf);
+							(VOID)OpensslProxy_SockEventDel(pstSockMgr, iEvtIndex);
+							CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Network Event Proxy handler error");
 						}
-					}
-				}
-				else if (pstPerSockInfo->eSockType ==  SOCKTYPE_PROXY )
-				{
+						break;
+					default:
 
-				}
-				else
-				{
-
+						break;
 				}
             }
         }
 
         if (NetworkEvents.lNetworkEvents & FD_CLOSE)
         {
-            
+			CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "NetworkEvents.lNetworkEvents FD_Close, iEvtIndex=%d sockfd=(%d)", iEvtIndex, pstPerSockInfo->sSockfd);
+			(VOID)OpensslProxy_SockEventDel(pstSockMgr, iEvtIndex);
         }
-
     }
 
     return 0;

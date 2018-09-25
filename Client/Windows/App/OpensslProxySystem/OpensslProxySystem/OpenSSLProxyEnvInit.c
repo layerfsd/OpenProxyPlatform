@@ -101,7 +101,7 @@ NTSTATUS	OpenSSLProxy_SetLocalProxyInfo(UINT32 uiLocalPid, USHORT usPort)
 	}
 
 	g_pstEnvCtx->ulLocalProxyPID = uiLocalPid;
-	g_pstEnvCtx->usLocalPort = htons(usPort);
+	g_pstEnvCtx->usLocalPort = usPort;
 
 	return STATUS_SUCCESS;
 }

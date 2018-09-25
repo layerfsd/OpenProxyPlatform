@@ -90,6 +90,8 @@ struct tagSocketMgr
 	UINT32				uiArryIndex;							            /*所在管理器数组索引, 找原来的线程时候需要*/
 	SOCKET				sUdpMsgSock;									/*简单通信的FD, 本地消息端口矩阵,  直接用UDP通信, 仅用于少量消息的线程间通信(大量时会不可靠)*/
     USHORT              usUdpMsgPort;									/*本线程的通信端口*/
+	SSL_CTX*				pstTlsCtxClient;									/*SSL上下文*/
+	SSL_CTX*				pstTlsCtxServer;								/*SSL上下文*/
     PERSOCKINFO_S	stArrySockInfo[WSAEVT_NUMS];		/*管理的Socket信息， 通过索引管理，这样就可以和网络事件复用相同索引，提高查找效率*/
 	SOCK_NEVET_S	stNetEvent;										/*网络触发事件*/
 	ULONG				ulSockNums;									/*当前有没有超过64-4个就可以了, 一个用作通信了, 然后保持成对*/
