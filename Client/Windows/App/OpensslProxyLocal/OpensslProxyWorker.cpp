@@ -60,9 +60,19 @@ INT32	OpensslProxy_NetworkEventLocalHandler(SOCK_MGR_S*         pstSockMgr, PPER
 				iError = SSL_accept(pstLocalSockInfo->stTlsInfo.pstSsl);
 				if (iError == -1)
 				{
-					CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl getError=%d", ERR_get_error());
+					iRet = SSL_get_error(pstLocalSockInfo->stTlsInfo.pstSsl, iError);
+					//iRet = ERR_get_error();
 					ERR_print_errors_fp(stdout);
-					return SYS_ERR;
+					if ( NULL == ERR_lib_error_string(iRet) )
+					{
+						CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl continue, error=%d:%s", iRet, ERR_lib_error_string(iRet));
+						return SYS_CONTUE;
+					}
+					else
+					{
+						CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl Error=%d:%s", iRet, ERR_lib_error_string(iRet));
+						return SYS_ERR;
+					}
 				}
 				else
 				{
@@ -209,7 +219,6 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
             {
 				pstPerSockInfo = &pstSockMgr->stArrySockInfo[iEvtIndex];
 
-				/*第一阶段，需要判断HTTPS还是HTTP*/
 				if ( TLSVERSION_INIT == pstPerSockInfo->stTlsInfo.uiTlsVersion )
 				{
 					pstPerSockInfo->stTlsInfo.uiTlsVersion = SSLPROXY_TLSVersionProtoCheck(pstPerSockInfo->sSockfd);
@@ -218,6 +227,7 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
 						pstPerSockInfo->bIsTls = TRUE;
 					}
 				}
+
 				switch ( pstPerSockInfo->eSockType )
 				{
 					case SOCKTYPE_LOCAL:

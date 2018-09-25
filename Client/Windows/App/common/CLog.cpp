@@ -488,6 +488,7 @@ void CLOG_writelog_level(char *pcModuleName,int level, const char *fmt, ...)
     {
         vsprintf_s(buffer + i, CLOG_WRITEBUF_LEN, fmt, argptr);                                              //可选参数
         bNeedWriteLog = true;
+		printf("[PrintfLog]: %s\n", buffer);
     }
     else
     {

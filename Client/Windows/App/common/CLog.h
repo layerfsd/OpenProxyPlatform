@@ -27,6 +27,10 @@ extern "C" {
 #define SYS_OK 0
 #endif
 
+#ifndef SYS_CONTUE
+#define SYS_CONTUE		-2
+#endif
+
 /*日志文件区分*/
 typedef enum
 {
