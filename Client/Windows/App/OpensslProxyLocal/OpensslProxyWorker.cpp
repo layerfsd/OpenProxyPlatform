@@ -83,6 +83,7 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
 
         if (NetworkEvents.lNetworkEvents & FD_READ)
         {
+			memset(acRecvBuf, 0, MSG_RECVBUF);
             /*消息处理*/
             if (sSocket == pstSockMgr->sUdpMsgSock )
             {
@@ -98,21 +99,47 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
                 {
                     CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "MessageCtrlMain udp recvfrom error, iRet=%d errorcode=(%d)\n", iRet, GetLastError());
                 }
+
+				/*直接继续接收*/
+				continue;
             }
             else
             {
 				pstPerSockInfo = &pstSockMgr->stArrySockInfo[iEvtIndex];
-
 				/*加入后，先启动本地的Socket*/
 				if ( pstPerSockInfo->eSockType == SOCKTYPE_LOCAL )
 				{
-					/*如果是本地的刚刚开始接收服务，需要先判断本地是否为TLS*/
+					/*1. 第一阶段: 本地的SSL初始化阶段*/
+					/*如果是本地的刚刚开始接收服务，需要先判断本地是否为TLS, 并尝试握手*/
 					if ( TLSVERSION_INIT == pstPerSockInfo->stTlsInfo.uiTlsVersion )
 					{
 						pstPerSockInfo->stTlsInfo.uiTlsVersion = SSLPROXY_TLSVersionProtoCheck(pstPerSockInfo->sSockfd);
 						if (TLSVERSION_NOTSSL != pstPerSockInfo->stTlsInfo.uiTlsVersion)
 						{
 							pstPerSockInfo->bIsTls = TRUE;
+
+							/*初次进入需要进行SSL_accept握手, 该处为本地的Socket类型，那么为服务端的SSL*/
+							pstPerSockInfo->stTlsInfo.pstSsl = SSL_new(pstTlsCtxServer);
+							if (NULL == pstPerSockInfo->stTlsInfo.pstSsl)
+							{
+								CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_new, ssl getError=%d", ERR_get_error());
+								ERR_print_errors_fp(stdout);
+								continue;
+							}
+
+							SSL_set_fd(pstPerSockInfo->stTlsInfo.pstSsl, (int)pstPerSockInfo->sSockfd);
+							iError = SSL_accept(pstPerSockInfo->stTlsInfo.pstSsl);
+							if (iError == -1)
+							{
+								CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl getError=%d", ERR_get_error());
+								ERR_print_errors_fp(stdout);
+								continue;
+							}
+							else
+							{
+								CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "SSL_Accept successful! sockfd=%d", pstPerSockInfo->sSockfd);
+								pstPerSockInfo->stTlsInfo.IsSslConnected = TRUE;
+							}
 						}
 						else
 						{
@@ -120,17 +147,39 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
 						}
 					}
 
+					/*2. 第一阶段: 本地的SSL握手阶段*/
 					/*加密处理流程*/
 					if (pstPerSockInfo->bIsTls)
 					{
-						/*是否已经连接成功*/
-						if (TRUE == pstPerSockInfo->stTlsInfo.IsSslConnected)
+						/*是否已经握手成功*/
+						if ( FALSE == pstPerSockInfo->stTlsInfo.IsSslConnected)
 						{
-
+							iError = SSL_accept(pstPerSockInfo->stTlsInfo.pstSsl);
+							if (iError == -1)
+							{
+								CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl getError=%d", ERR_get_error());
+								ERR_print_errors_fp(stdout);
+								continue;
+							}
+							else
+							{
+								pstPerSockInfo->stTlsInfo.IsSslConnected = TRUE;
+							}
+						}
+						else
+						{
+							
+							/*握手成功后，进入读取的数据阶段*/
+							iError = SSL_read(pstPerSockInfo->stTlsInfo.pstSsl, acRecvBuf, MSG_RECVBUF);
+							if (iError > 0 )
+							{
+								CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "SSL_read successful! acRecvBuf=[%d]%s", iError, acRecvBuf);
+							}
+						
 						}
 					}
 					else
-					/*非加密的处理流程*/
+					/*非加密的处理流程, 直接读取相关数据即可*/
 					{
 						iRet = recv(sSocket, acRecvBuf, MSG_RECVBUF, 0);
 						if (iRet == 0 || (iRet == SOCKET_ERROR && WSAGetLastError() == WSAECONNRESET))
@@ -488,7 +537,7 @@ SOCK_MGR_S *OpensslProxy_SockMgrCreate(WORKER_CTX_S *pstWorker, UINT32   uiArryI
         return NULL;
     }
 
-    iRet = ioctlsocket(pstSockMgr->sUdpMsgSock, FIONBIO, (unsigned long *)&ulBlock);//设置成非阻塞模式。  
+    iRet = ioctlsocket(pstSockMgr->sUdpMsgSock, FIONBIO, (unsigned long *)&ulBlock);//设置成非阻塞模式??  
     if (iRet == SOCKET_ERROR)//设置失败。
     {
         CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Set ioctrl fionbio error=%d\n", WSAGetLastError());

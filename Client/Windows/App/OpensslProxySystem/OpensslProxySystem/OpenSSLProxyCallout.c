@@ -28,7 +28,8 @@
 UINT32					g_uiConnectRedirectCalloutIdV4 = 0;
 HANDLE					g_hRedirectHandle			= NULL;
 
-
+//参考
+//https://technet.microsoft.com/zh-cn/ff571005(v=vs.94)
 VOID OpenSSLProxy_ConnectionRedirectClassify(
 	IN const FWPS_INCOMING_VALUES*						inFixedValues,
 	IN const FWPS_INCOMING_METADATA_VALUES* inMetaValues,
@@ -55,10 +56,10 @@ VOID OpenSSLProxy_ConnectionRedirectClassify(
 	UINT32		localipaddr = 0;
 	USHORT		localport = 0;
 
-	if ( FALSE == gConnectionRedirectEnable )
-	{
-		goto Exit;
-	}
+    if ( FALSE == gConnectionRedirectEnable )
+    {
+        goto Exit;
+    }
 
 	if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0)
 	{
@@ -103,6 +104,7 @@ VOID OpenSSLProxy_ConnectionRedirectClassify(
 	}
 	}
 #endif /// (NTDDI_VERSION >= NTDDI_WIN8)
+
 	Status = FwpsAcquireClassifyHandle((void*)classifyContext, 0, &ClassifyHandle);
 	if (Status != STATUS_SUCCESS)
 	{
@@ -114,8 +116,7 @@ VOID OpenSSLProxy_ConnectionRedirectClassify(
 		filter->filterId,
 		0,
 		&WriteableLayerData,
-		classifyOut
-	);
+		classifyOut);
 	if (Status != STATUS_SUCCESS)
 	{
 		KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->FwpsAcquireWritableLayerDataPointer error!status=%#x\n", Status));
@@ -149,71 +150,108 @@ VOID OpenSSLProxy_ConnectionRedirectClassify(
 		}
 	}
 
-	pConnectRequest = (FWPS_CONNECT_REQUEST*)WriteableLayerData;
+    pConnectRequest = (FWPS_CONNECT_REQUEST*)WriteableLayerData;
+
+#if(NTDDI_VERSION >= NTDDI_WIN8)
+    /// Set redirectHandle only if proxying locally
+    if (g_hRedirectHandle)
+        pConnectRequest->localRedirectHandle = g_hRedirectHandle;
+
+    pSockAddrStorage = ExAllocatePool(NonPagedPool, 2 * sizeof(SOCKADDR_STORAGE));
+
+    /// Pass original remote destination values to query them in user mode
+    RtlCopyMemory(&(pSockAddrStorage[0]),
+        &(pConnectRequest->remoteAddressAndPort),
+        sizeof(SOCKADDR_STORAGE));
+
+    RtlCopyMemory(&(pSockAddrStorage[1]),
+        &(pConnectRequest->localAddressAndPort),
+        sizeof(SOCKADDR_STORAGE));
+
+    /// WFP will take ownership of this memory and free it when the flow / redirection terminates
+    pConnectRequest->localRedirectContext = pSockAddrStorage;
+    pConnectRequest->localRedirectContextSize = sizeof(SOCKADDR_STORAGE) * 2;
+
+#endif /// (NTDDI_VERSION >= NTDDI_WIN8)
 
 	remoteipaddr = ((PSOCKADDR_IN)&(pConnectRequest->remoteAddressAndPort))->sin_addr.S_un.S_addr;
 	remotePort = ((PSOCKADDR_IN)&(pConnectRequest->remoteAddressAndPort))->sin_port;
 	localipaddr = ((PSOCKADDR_IN)&(pConnectRequest->localAddressAndPort))->sin_addr.S_un.S_addr;
 	localport = ((PSOCKADDR_IN)&(pConnectRequest->localAddressAndPort))->sin_port;
 
-	if ( TRUE == OpenSSLProxy_IsPortInRange(localport) )
-	{
-		goto Exit;
-	}
+    /*KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Tcp connection Info: [pto=%d] %08x:%d --> %08x:%d,PID=%d\n",
+        Protocol, ntohl(localipaddr), ntohs(localport), ntohl(remoteipaddr), ntohs(remotePort), ProcessID));*/
+
+    if ( TRUE == OpenSSLProxy_IsPortInRange(localport))
+    {
+        goto Exit;
+    }
 
 	if ( TRUE == OpenSSLProxy_RuleIsMatch(remoteipaddr, remotePort) )
 	{
-		KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Ale Redirect connection Rule is Match! [pto=%d] %08x:%d --> %08x:%d,PID=%d\n",
-			Protocol, ntohl(localipaddr), ntohs(localport), ntohl(remoteipaddr), ntohs(remotePort), ProcessID));
-
+        /*KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Before|| Redirect Rule Matched: [pto=%02d] %08x:%d --> %08x:%d,NetPID=%d, LocalProxy:[pid=%d, 127.0.0.1:%d]\n",
+            Protocol, ntohl(localipaddr), ntohs(localport), ntohl(remoteipaddr), ntohs(remotePort), ProcessID, OpenSSLProxy_GetLocalProxyPID(), ntohs(OpenSSLProxy_GetLocalProxyPort())));*/
 		if (INETADDR_ISANY((PSOCKADDR)&(pConnectRequest->localAddressAndPort)))
 		{
 			INETADDR_SETLOOPBACK((PSOCKADDR)&(pConnectRequest->remoteAddressAndPort));
 		}
-		else
-		{
-			INETADDR_SET_ADDRESS((PSOCKADDR)&(pConnectRequest->remoteAddressAndPort),
-				INETADDR_ADDRESS((PSOCKADDR)&(pConnectRequest->localAddressAndPort)));
-		}
-
-		INETADDR_SET_ADDRESS((PSOCKADDR)&(pConnectRequest->remoteAddressAndPort), (const UCHAR *)OpenSSLProxy_GetLocalSockaddr());
+        else
+        {
+            INETADDR_SET_ADDRESS((PSOCKADDR)&(pConnectRequest->remoteAddressAndPort), (const UCHAR *)OpenSSLProxy_GetLocalSockaddr());
+        }
+		
 		INETADDR_SET_PORT((PSOCKADDR)&(pConnectRequest->remoteAddressAndPort), OpenSSLProxy_GetLocalProxyPort());
 		pConnectRequest->localRedirectTargetPID = OpenSSLProxy_GetLocalProxyPID();
+
+
+        remoteipaddr = ((PSOCKADDR_IN)&(pConnectRequest->remoteAddressAndPort))->sin_addr.S_un.S_addr;
+        remotePort = ((PSOCKADDR_IN)&(pConnectRequest->remoteAddressAndPort))->sin_port;
+        localipaddr = ((PSOCKADDR_IN)&(pConnectRequest->localAddressAndPort))->sin_addr.S_un.S_addr;
+        localport = ((PSOCKADDR_IN)&(pConnectRequest->localAddressAndPort))->sin_port;
+
+        KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Redirect Rule Matched: [pto=%02d] %08x:%d --> %08x:%d,NetPID=%d, LocalProxy:[pid=%d, 127.0.0.1:%d]\n",
+            Protocol, ntohl(localipaddr), ntohs(localport), ntohl(remoteipaddr), ntohs(remotePort), ProcessID, OpenSSLProxy_GetLocalProxyPID(), ntohs(OpenSSLProxy_GetLocalProxyPort())));
 	}
+    else
+    {
+#if  DBG
+       KdPrint(("[OPENSSLDRV]: #ConnectionRedirectClassify#-->Not Match Any Rule List! IPAddrInfo=%08x:%d\n", ntohl(remoteipaddr), ntohs(remotePort)));
+#endif
+    }
 
 Exit:
 #if(NTDDI_VERSION >= NTDDI_WIN8)
-	if (Status != STATUS_SUCCESS)
-	{
-		if (pSockAddrStorage != NULL)
-		{
-			ExFreePool(pSockAddrStorage);
-		}
-	}
-
+    if (Status != STATUS_SUCCESS)
+    {
+        if (pSockAddrStorage != NULL)
+        {
+            ExFreePool(pSockAddrStorage);
+        }
+    }
 #endif 
-	if (Status != STATUS_SUCCESS)
-	{
-		classifyOut->actionType = FWP_ACTION_BLOCK;
-	}
-	else
-	{
-		classifyOut->actionType = FWP_ACTION_PERMIT;
-	}
+    if ( Status != STATUS_SUCCESS )
+    {
+        classifyOut->actionType = FWP_ACTION_BLOCK;
+    }
+    else
+    {
+        classifyOut->actionType = FWP_ACTION_PERMIT;
+    }
 
-	classifyOut->rights ^= FWPS_RIGHT_ACTION_WRITE;
+    classifyOut->rights ^= FWPS_RIGHT_ACTION_WRITE;
 
-	if (WriteableLayerData)
-	{
-		FwpsApplyModifiedLayerData(ClassifyHandle,
-			WriteableLayerData,
-			FWPS_CLASSIFY_FLAG_REAUTHORIZE_IF_MODIFIED_BY_OTHERS);
-	}
+    /*必须要调用，否则蓝屏*/
+    if ( NULL != WriteableLayerData)
+    {
+        FwpsApplyModifiedLayerData(ClassifyHandle,
+            WriteableLayerData,
+            FWPS_CLASSIFY_FLAG_REAUTHORIZE_IF_MODIFIED_BY_OTHERS);
+    }
 
-	if (ClassifyHandle)
-	{
-		FwpsReleaseClassifyHandle(ClassifyHandle);
-	}
+    if (ClassifyHandle)
+    {
+        FwpsReleaseClassifyHandle(ClassifyHandle);
+    }
 
 	UNREFERENCED_PARAMETER(layerData);
 	UNREFERENCED_PARAMETER(flowContext);
@@ -257,6 +295,7 @@ NTSTATUS OpenSSLProxy_ConnectRedirectAddFilter(
 	filter.subLayerKey = OPENSSLPROXY_SUBLAYER;
 	filter.rawContext = context;
 
+
 	//filter.weight.type = FWP_UINT64;
 	filter.weight.uint64 = &_64;
 
@@ -265,8 +304,14 @@ NTSTATUS OpenSSLProxy_ConnectRedirectAddFilter(
 	filterConditions[conditionIndex].fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
 	filterConditions[conditionIndex].matchType = FWP_MATCH_NOT_EQUAL;
 	filterConditions[conditionIndex].conditionValue.type = FWP_UINT32;
-	filterConditions[conditionIndex].conditionValue.uint32 = htonl(0x7F000001);
+    filterConditions[conditionIndex].conditionValue.uint32 = 0x7F000001;
 	conditionIndex++;
+
+    filterConditions[conditionIndex].fieldKey = FWPM_CONDITION_IP_LOCAL_ADDRESS;
+    filterConditions[conditionIndex].matchType = FWP_MATCH_NOT_EQUAL;
+    filterConditions[conditionIndex].conditionValue.type = FWP_UINT32;
+    filterConditions[conditionIndex].conditionValue.uint32 = 0x7F000001;
+    conditionIndex++;
 
 	filter.numFilterConditions = conditionIndex;
 	status = FwpmFilterAdd(

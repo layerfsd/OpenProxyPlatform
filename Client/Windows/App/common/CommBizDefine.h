@@ -44,8 +44,8 @@ typedef enum
 /*开始的UDP消息端口*/
 #define         MSG_UDPPORT_START       12000
 
-typedef struct tagPerSockInfo  PERSOCKINFO_S, *PPERSOCKINFO_S;
-typedef struct tagSocketMgr SOCK_MGR_S, *PSOCK_MGR_S;
+typedef struct tagPerSockInfo		PERSOCKINFO_S, *PPERSOCKINFO_S;
+typedef struct tagSocketMgr		SOCK_MGR_S, *PSOCK_MGR_S;
 typedef struct tagPerSockTlsInfo SOCK_TLSINFO_S, *PSOCK_TLSINFO_S;
 
 typedef INT32(*PFSOCKCTRLCB)(SOCK_MGR_S *pstSockMgr, UINT32 uiIndex, UINT32 uiCtrlCode);
