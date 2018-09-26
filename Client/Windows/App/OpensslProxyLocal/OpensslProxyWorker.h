@@ -18,9 +18,9 @@ INT32       OpensslProxy_DispatchNetworkByBlanceAlgm(SOCKET sNewClientFd, UINT32
 
 INT32       OpensslProxy_SockMgr_MainWorkerSendto(CHAR *pcSndBuf, UINT32 uiSendLen, UINT32 uiArryIndex);
 
-INT32       OpensslProxy_SockEventDel(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex);
+INT32       OpensslProxy_PerSockEventDel(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex);
 
-INT32       OpensslProxy_SockEventAdd(SOCK_MGR_S *pstSockMgr, SOCKET sSocketFd, UINT32 uiSockType);
+INT32       OpensslProxy_PerSockEventAdd(SOCK_MGR_S *pstSockMgr, SOCKET sSocketFd, UINT32 uiSockType);
 
 
 

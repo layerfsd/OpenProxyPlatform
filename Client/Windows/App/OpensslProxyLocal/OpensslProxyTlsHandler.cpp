@@ -64,7 +64,6 @@ SSL_CTX *SSLPROXY_TLSCtxNewServer()
 	return pstTlsCtxServer;
 }
 
-
 UINT32	SSLPROXY_TLSVersionProtoCheck(SOCKET sLocalSock)
 {
 	INT32		iRet = 0;

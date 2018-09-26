@@ -128,7 +128,7 @@ unsigned int __stdcall OpensslProxy_LocalAccept(PVOID pvArg)
             }
             else
             {
-                CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "Accept a new Local client info=%s:%d!", acAddr, usClientPort);
+                CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "Accept a new Local client info=%s:%d, sockfd=%d!", acAddr, usClientPort, stNewClientInfo.sLocalFD);
             }
         }
         else

@@ -50,7 +50,7 @@ INT32	OpensslProxy_NetworkEventLocalHandler(SOCK_MGR_S*         pstSockMgr, PPER
 			pstLocalSockInfo->stTlsInfo.pstSsl = SSL_new(pstSockMgr->pstTlsCtxServer);
 			if (NULL == pstLocalSockInfo->stTlsInfo.pstSsl)
 			{
-				CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_new, ssl getError=%d", ERR_get_error());
+				CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_new, ssl getError=%d, sockfd=%d", ERR_get_error(), pstLocalSockInfo->sSockfd);
 				ERR_print_errors_fp(stdout);
 				return SYS_ERR;
 			}
@@ -62,15 +62,16 @@ INT32	OpensslProxy_NetworkEventLocalHandler(SOCK_MGR_S*         pstSockMgr, PPER
 				{
 					iRet = SSL_get_error(pstLocalSockInfo->stTlsInfo.pstSsl, iError);
 					//iRet = ERR_get_error();
-					ERR_print_errors_fp(stdout);
-					if ( NULL == ERR_lib_error_string(iRet) )
+					//ERR_print_errors_fp(stdout);
+					//if ( NULL == ERR_lib_error_string(iRet) 
+					if (SSL_ERROR_WANT_READ == iRet )
 					{
-						CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl continue, error=%d:%s", iRet, ERR_lib_error_string(iRet));
+						CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "Local socket SSL_Accept, ssl continue, error=%d:%s,sockfd=%d", iRet, ERR_lib_error_string(iRet), pstLocalSockInfo->sSockfd);
 						return SYS_CONTUE;
 					}
 					else
 					{
-						CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl Error=%d:%s", iRet, ERR_lib_error_string(iRet));
+						CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl Error=%d:%s, sockfd=%d", iRet, ERR_lib_error_string(iRet),  pstLocalSockInfo->sSockfd);
 						return SYS_ERR;
 					}
 				}
@@ -89,11 +90,11 @@ INT32	OpensslProxy_NetworkEventLocalHandler(SOCK_MGR_S*         pstSockMgr, PPER
 				iError = SSL_read(pstLocalSockInfo->stTlsInfo.pstSsl, acRecvBuf, MSG_RECVBUF);
 				if (iError > 0)
 				{
-					CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "SSL_read successful! acRecvBuf=[%d]:%s", iError, acRecvBuf);
+					CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "SSL_read successful! acRecvBuf=[%d]:%s, sockfd=%d", iError, acRecvBuf, pstLocalSockInfo->sSockfd);
 				}
 				else
 				{
-					CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "SSL_read error! errorCode=%d", SSL_get_error(pstLocalSockInfo->stTlsInfo.pstSsl, iError));
+					CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "SSL_read error! errorCode=%d,sockfd=%d", SSL_get_error(pstLocalSockInfo->stTlsInfo.pstSsl, iError), pstLocalSockInfo->sSockfd);
 					return SYS_ERR;
 				}
 			}
@@ -102,9 +103,20 @@ INT32	OpensslProxy_NetworkEventLocalHandler(SOCK_MGR_S*         pstSockMgr, PPER
 				iError = SSL_accept(pstLocalSockInfo->stTlsInfo.pstSsl);
 				if (iError == -1)
 				{
-					CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Local socket SSL_Accept, ssl getError=%d", ERR_get_error());
-					ERR_print_errors_fp(stdout);
-					return SYS_ERR;
+					iRet = SSL_get_error(pstLocalSockInfo->stTlsInfo.pstSsl, iError);
+					//iRet = ERR_get_error();
+					//ERR_print_errors_fp(stdout);
+					//if (NULL == ERR_lib_error_string(iRet)
+					if( SSL_ERROR_WANT_READ == iRet)
+					{
+						CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "Again SSL_Accept, ssl continue, error=%d:%s, sockfd=%d", iRet, ERR_lib_error_string(iRet), pstLocalSockInfo->sSockfd);
+						return SYS_CONTUE;
+					}
+					else
+					{
+						CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Again SSL_Accept, ssl Error=%d:%s, sockfd=%d", iRet, ERR_lib_error_string(iRet), pstLocalSockInfo->sSockfd);
+						return SYS_ERR;
+					}
 				}
 				else
 				{
@@ -233,14 +245,14 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
 					case SOCKTYPE_LOCAL:
 						if ( SYS_ERR== OpensslProxy_NetworkEventLocalHandler(pstSockMgr, pstPerSockInfo) )
 						{
-							(VOID)OpensslProxy_SockEventDel(pstSockMgr, iEvtIndex);
+							(VOID)OpensslProxy_PerSockEventDel(pstSockMgr, iEvtIndex);
 							CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Network Event Local handler error");
 						}
 						break;
 					case SOCKTYPE_PROXY:
 						if (SYS_ERR == OpensslProxy_NetworkEventProxyHandler(pstSockMgr, pstPerSockInfo))
 						{
-							(VOID)OpensslProxy_SockEventDel(pstSockMgr, iEvtIndex);
+							(VOID)OpensslProxy_PerSockEventDel(pstSockMgr, iEvtIndex);
 							CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Network Event Proxy handler error");
 						}
 						break;
@@ -254,9 +266,12 @@ unsigned int __stdcall OpensslProxy_NetworkEventsWorker(void *pvArgv)
         if (NetworkEvents.lNetworkEvents & FD_CLOSE)
         {
 			CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "NetworkEvents.lNetworkEvents FD_Close, iEvtIndex=%d sockfd=(%d)", iEvtIndex, pstPerSockInfo->sSockfd);
-			(VOID)OpensslProxy_SockEventDel(pstSockMgr, iEvtIndex);
+			(VOID)OpensslProxy_PerSockEventDel(pstSockMgr, iEvtIndex);
         }
     }
+
+	CLOG_writelog_level("LPXY", CLOG_LEVEL_EVENT, "Network Event Pthread Handler End!index=%d", pstSockMgr->uiArryIndex);
+
 
     return 0;
 }
@@ -271,7 +286,7 @@ VOID   OpensslProxy_NetworkEventReset(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex)
     pstSockMgr->stNetEvent.arrSocketEvts[uiEvtIndex] = INVALID_SOCKET;
 }
 
-INT32 OpensslProxy_SockEventCtrl(SOCK_MGR_S *pstSockMgr, UINT32 uiIndex, UINT32 uiCtrlCode)
+INT32 OpensslProxy_PerSockEventCtrl(SOCK_MGR_S *pstSockMgr, UINT32 uiIndex, UINT32 uiCtrlCode)
 {
     /*TODO: 这块其实应该是需要获取原先的，然后取消或者添加相关位*/
     ULONG   ulEventMask = 0;
@@ -284,7 +299,7 @@ INT32 OpensslProxy_SockEventCtrl(SOCK_MGR_S *pstSockMgr, UINT32 uiIndex, UINT32 
     switch (uiCtrlCode)
     {
         case SOCKCTRL_SHUTDOWN:
-                (VOID)OpensslProxy_SockEventDel(pstSockMgr, uiIndex);
+                (VOID)OpensslProxy_PerSockEventDel(pstSockMgr, uiIndex);
             break;
         case SOCKCTRL_CLOSE_RECV:
             ulEventMask = FD_CLOSE;
@@ -322,7 +337,7 @@ VOID   OpensslProxy_PerSockInfoReset(PERSOCKINFO_S *pstPerSockInfo)
     pstPerSockInfo->hEvtHandle = NULL;
     pstPerSockInfo->lEvtsIndex = -1; 
     pstPerSockInfo->lPeerEvtsIndex = -1;
-    pstPerSockInfo->pfSockCtrlCb = OpensslProxy_SockEventCtrl;
+    pstPerSockInfo->pfSockCtrlCb = OpensslProxy_PerSockEventCtrl;
 }
 
 /*获取对端的事件索引*/
@@ -331,31 +346,37 @@ INT32    OpensslProxy_GetPeerSockEventIndex(PERSOCKINFO_S *pstPerSockInfo)
     return pstPerSockInfo->lPeerEvtsIndex;
 }
 
+INT32       OpensslProxy_UpdateSockEventPeerIndex(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex, UINT32 uiPeerIndex)
+{
+	if (NULL == pstSockMgr
+		|| uiEvtIndex >= WSAEVT_NUMS)
+	{
+		return SYS_ERR;
+	}
+
+	if (INVALID_SOCKET != pstSockMgr->stArrySockInfo[uiEvtIndex].sSockfd)
+		pstSockMgr->stArrySockInfo[uiEvtIndex].lPeerEvtsIndex = uiPeerIndex;
+
+	return SYS_OK;
+}
 VOID       OpensslProxy_PerSockEventClear(PERSOCKINFO_S *pstPerSockInfo)
 {
     /*直接检查释放掉所有的本Socket相关IoBuf资源*/
     COMM_IOBUF_BufListRelease(&pstPerSockInfo->stIoBufList);
-
+	if (pstPerSockInfo->bIsTls)
+	{
+		if ( NULL != pstPerSockInfo->stTlsInfo.pstSsl )
+		{
+			SSL_free(pstPerSockInfo->stTlsInfo.pstSsl);
+			pstPerSockInfo->stTlsInfo.pstSsl = NULL;
+		}
+	}
     /*先关闭本socket的所有资源*/
     shutdown(pstPerSockInfo->sSockfd, SD_BOTH);
     closesocket(pstPerSockInfo->sSockfd);
 }
 
-INT32       OpensslProxy_UpdateSockEventPeerIndex(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex, UINT32 uiPeerIndex)
-{
-    if ( NULL == pstSockMgr
-        || uiEvtIndex >= WSAEVT_NUMS )
-    {
-        return SYS_ERR;
-    }
-
-    if( INVALID_SOCKET != pstSockMgr->stArrySockInfo[uiEvtIndex].sSockfd )
-            pstSockMgr->stArrySockInfo[uiEvtIndex].lPeerEvtsIndex = uiPeerIndex;
-
-    return SYS_OK;
-}
-
-INT32       OpensslProxy_SockEventAdd(SOCK_MGR_S *pstSockMgr,SOCKET sSocketFd, UINT32 uiSockType)
+INT32       OpensslProxy_PerSockEventAdd(SOCK_MGR_S *pstSockMgr,SOCKET sSocketFd, UINT32 uiSockType)
 {
     if ( NULL == pstSockMgr 
         || INVALID_SOCKET == sSocketFd 
@@ -397,7 +418,7 @@ INT32       OpensslProxy_SockEventAdd(SOCK_MGR_S *pstSockMgr,SOCKET sSocketFd, U
 }
 
 /*删除本网络事件，注意： 确保在删除之前，将对端也删除*/
-INT32       OpensslProxy_SockEventDel(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex)
+INT32       OpensslProxy_PerSockEventDel(SOCK_MGR_S *pstSockMgr, UINT32 uiEvtIndex)
 {
     PPERSOCKINFO_S pstPeerSockInfo = NULL;
     INT32  iPeerIndex = 0;
@@ -596,7 +617,7 @@ SOCK_MGR_S *OpensslProxy_SockMgrCreate(WORKER_CTX_S *pstWorker, UINT32   uiArryI
     }
 
     /*添加消息socket到本网络事件中进行处理*/
-    if ( SYS_ERR == OpensslProxy_SockEventAdd(pstSockMgr,  pstSockMgr->sUdpMsgSock, SOCKTYPE_MSG) )
+    if ( SYS_ERR == OpensslProxy_PerSockEventAdd(pstSockMgr,  pstSockMgr->sUdpMsgSock, SOCKTYPE_MSG) )
     {
         CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Add socket network event error=%d\n", WSAGetLastError());
         closesocket(pstSockMgr->sUdpMsgSock);
@@ -630,8 +651,18 @@ SOCK_MGR_S *OpensslProxy_SockMgrCreate(WORKER_CTX_S *pstWorker, UINT32   uiArryI
 
 VOID OpensslProxy_SockMgrRelease(SOCK_MGR_S *pstSockMgr)
 {
+	PERSOCKINFO_S *pstPerSockInfo = NULL;
+
     if (NULL != pstSockMgr)
     {
+		for (int index = 0; index < WSAEVT_NUMS; index++)
+		{
+			pstPerSockInfo = &pstSockMgr->stArrySockInfo[index];
+			if (INVALID_SOCKET != pstPerSockInfo->sSockfd )
+			{
+				OpensslProxy_PerSockEventDel(pstSockMgr, pstPerSockInfo->lEvtsIndex);
+			}
+		}
         free(pstSockMgr);
     }
 }

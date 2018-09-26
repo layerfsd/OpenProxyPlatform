@@ -36,7 +36,7 @@ INT32 OpensslProxy_MessageCtrlMain(VOID *pvCtx, CHAR *acBuf, UINT32 uiLen)
 				SOCK_MGR_S*				  pstSockMgr = (SOCK_MGR_S*)pvCtx;
 
 				/*添加本地的客户端信息*/
-				if ( SYS_ERR == OpensslProxy_SockEventAdd(pstSockMgr, pstSnd->sClientSockfd, SOCKTYPE_LOCAL) )
+				if ( SYS_ERR == OpensslProxy_PerSockEventAdd(pstSockMgr, pstSnd->sClientSockfd, SOCKTYPE_LOCAL) )
 				{
 					CLOG_writelog_level("LPXY", CLOG_LEVEL_ERROR, "Message ctrl main handler sock event add error!");
 					return SYS_ERR;
